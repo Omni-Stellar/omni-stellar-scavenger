@@ -39,35 +39,13 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "u32": 0
+                  "u32": 1
                 },
                 {
-                  "u64": 10
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "create_incentive",
-              "args": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                  "u64": 50
                 },
                 {
-                  "u32": 2
-                },
-                {
-                  "u64": 20
+                  "u64": 10000
                 }
               ]
             }
@@ -92,7 +70,38 @@
                   "u32": 3
                 },
                 {
+                  "u64": 100
+                },
+                {
+                  "u64": 15000
+                }
+              ]
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "function_name": "create_incentive",
+              "args": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
+                {
+                  "u32": 4
+                },
+                {
                   "u64": 30
+                },
+                {
+                  "u64": 8000
                 }
               ]
             }
@@ -142,6 +151,63 @@
                         "key": {
                           "vec": [
                             {
+                              "string": "general_incentives"
+                            },
+                            {
+                              "u32": 1
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u64": 1
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "string": "general_incentives"
+                            },
+                            {
+                              "u32": 3
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u64": 2
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "string": "general_incentives"
+                            },
+                            {
+                              "u32": 4
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u64": 3
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
                               "string": "incentive"
                             },
                             {
@@ -177,7 +243,23 @@
                             },
                             {
                               "key": {
-                                "symbol": "manufacturer"
+                                "symbol": "remaining_budget"
+                              },
+                              "val": {
+                                "u64": 10000
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "reward_points"
+                              },
+                              "val": {
+                                "u64": 50
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "rewarder"
                               },
                               "val": {
                                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -185,10 +267,10 @@
                             },
                             {
                               "key": {
-                                "symbol": "reward_amount"
+                                "symbol": "total_budget"
                               },
                               "val": {
-                                "u64": 10
+                                "u64": 10000
                               }
                             },
                             {
@@ -196,7 +278,7 @@
                                 "symbol": "waste_type"
                               },
                               "val": {
-                                "u32": 0
+                                "u32": 1
                               }
                             }
                           ]
@@ -241,7 +323,23 @@
                             },
                             {
                               "key": {
-                                "symbol": "manufacturer"
+                                "symbol": "remaining_budget"
+                              },
+                              "val": {
+                                "u64": 15000
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "reward_points"
+                              },
+                              "val": {
+                                "u64": 100
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "rewarder"
                               },
                               "val": {
                                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -249,10 +347,10 @@
                             },
                             {
                               "key": {
-                                "symbol": "reward_amount"
+                                "symbol": "total_budget"
                               },
                               "val": {
-                                "u64": 20
+                                "u64": 15000
                               }
                             },
                             {
@@ -260,7 +358,7 @@
                                 "symbol": "waste_type"
                               },
                               "val": {
-                                "u32": 2
+                                "u32": 3
                               }
                             }
                           ]
@@ -305,15 +403,15 @@
                             },
                             {
                               "key": {
-                                "symbol": "manufacturer"
+                                "symbol": "remaining_budget"
                               },
                               "val": {
-                                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                                "u64": 8000
                               }
                             },
                             {
                               "key": {
-                                "symbol": "reward_amount"
+                                "symbol": "reward_points"
                               },
                               "val": {
                                 "u64": 30
@@ -321,10 +419,26 @@
                             },
                             {
                               "key": {
+                                "symbol": "rewarder"
+                              },
+                              "val": {
+                                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "total_budget"
+                              },
+                              "val": {
+                                "u64": 8000
+                              }
+                            },
+                            {
+                              "key": {
                                 "symbol": "waste_type"
                               },
                               "val": {
-                                "u32": 3
+                                "u32": 4
                               }
                             }
                           ]
@@ -340,6 +454,31 @@
                         },
                         "val": {
                           "u64": 3
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "string": "rewarder_incentives"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u64": 1
+                            },
+                            {
+                              "u64": 2
+                            },
+                            {
+                              "u64": 3
+                            }
+                          ]
                         }
                       },
                       {
@@ -650,10 +789,13 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "u32": 0
+                  "u32": 1
                 },
                 {
-                  "u64": 10
+                  "u64": 50
+                },
+                {
+                  "u64": 10000
                 }
               ]
             }
@@ -705,7 +847,23 @@
                 },
                 {
                   "key": {
-                    "symbol": "manufacturer"
+                    "symbol": "remaining_budget"
+                  },
+                  "val": {
+                    "u64": 10000
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "reward_points"
+                  },
+                  "val": {
+                    "u64": 50
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "rewarder"
                   },
                   "val": {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -713,10 +871,10 @@
                 },
                 {
                   "key": {
-                    "symbol": "reward_amount"
+                    "symbol": "total_budget"
                   },
                   "val": {
-                    "u64": 10
+                    "u64": 10000
                   }
                 },
                 {
@@ -724,115 +882,7 @@
                     "symbol": "waste_type"
                   },
                   "val": {
-                    "u32": 0
-                  }
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
-              },
-              {
-                "symbol": "create_incentive"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-                },
-                {
-                  "u32": 2
-                },
-                {
-                  "u64": 20
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "create_incentive"
-              }
-            ],
-            "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "active"
-                  },
-                  "val": {
-                    "bool": true
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "created_at"
-                  },
-                  "val": {
-                    "u64": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "id"
-                  },
-                  "val": {
-                    "u64": 2
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "manufacturer"
-                  },
-                  "val": {
-                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "reward_amount"
-                  },
-                  "val": {
-                    "u64": 20
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "waste_type"
-                  },
-                  "val": {
-                    "u32": 2
+                    "u32": 1
                   }
                 }
               ]
@@ -869,7 +919,137 @@
                   "u32": 3
                 },
                 {
+                  "u64": 100
+                },
+                {
+                  "u64": 15000
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "create_incentive"
+              }
+            ],
+            "data": {
+              "map": [
+                {
+                  "key": {
+                    "symbol": "active"
+                  },
+                  "val": {
+                    "bool": true
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "created_at"
+                  },
+                  "val": {
+                    "u64": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "id"
+                  },
+                  "val": {
+                    "u64": 2
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "remaining_budget"
+                  },
+                  "val": {
+                    "u64": 15000
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "reward_points"
+                  },
+                  "val": {
+                    "u64": 100
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "rewarder"
+                  },
+                  "val": {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "total_budget"
+                  },
+                  "val": {
+                    "u64": 15000
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "waste_type"
+                  },
+                  "val": {
+                    "u32": 3
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": null,
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
+              },
+              {
+                "symbol": "create_incentive"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
+                {
+                  "u32": 4
+                },
+                {
                   "u64": 30
+                },
+                {
+                  "u64": 8000
                 }
               ]
             }
@@ -921,15 +1101,15 @@
                 },
                 {
                   "key": {
-                    "symbol": "manufacturer"
+                    "symbol": "remaining_budget"
                   },
                   "val": {
-                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                    "u64": 8000
                   }
                 },
                 {
                   "key": {
-                    "symbol": "reward_amount"
+                    "symbol": "reward_points"
                   },
                   "val": {
                     "u64": 30
@@ -937,10 +1117,26 @@
                 },
                 {
                   "key": {
+                    "symbol": "rewarder"
+                  },
+                  "val": {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "total_budget"
+                  },
+                  "val": {
+                    "u64": 8000
+                  }
+                },
+                {
+                  "key": {
                     "symbol": "waste_type"
                   },
                   "val": {
-                    "u32": 3
+                    "u32": 4
                   }
                 }
               ]
@@ -965,7 +1161,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_incentive"
+                "symbol": "incentive_exists"
               }
             ],
             "data": {
@@ -988,60 +1184,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_incentive"
+                "symbol": "incentive_exists"
               }
             ],
             "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "active"
-                  },
-                  "val": {
-                    "bool": true
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "created_at"
-                  },
-                  "val": {
-                    "u64": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "id"
-                  },
-                  "val": {
-                    "u64": 1
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "manufacturer"
-                  },
-                  "val": {
-                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "reward_amount"
-                  },
-                  "val": {
-                    "u64": 10
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "waste_type"
-                  },
-                  "val": {
-                    "u32": 0
-                  }
-                }
-              ]
+              "bool": true
             }
           }
         }
@@ -1063,7 +1210,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_incentive"
+                "symbol": "incentive_exists"
               }
             ],
             "data": {
@@ -1086,60 +1233,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_incentive"
+                "symbol": "incentive_exists"
               }
             ],
             "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "active"
-                  },
-                  "val": {
-                    "bool": true
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "created_at"
-                  },
-                  "val": {
-                    "u64": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "id"
-                  },
-                  "val": {
-                    "u64": 2
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "manufacturer"
-                  },
-                  "val": {
-                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "reward_amount"
-                  },
-                  "val": {
-                    "u64": 20
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "waste_type"
-                  },
-                  "val": {
-                    "u32": 2
-                  }
-                }
-              ]
+              "bool": true
             }
           }
         }
@@ -1161,7 +1259,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_incentive"
+                "symbol": "incentive_exists"
               }
             ],
             "data": {
@@ -1184,60 +1282,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_incentive"
+                "symbol": "incentive_exists"
               }
             ],
             "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "active"
-                  },
-                  "val": {
-                    "bool": true
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "created_at"
-                  },
-                  "val": {
-                    "u64": 0
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "id"
-                  },
-                  "val": {
-                    "u64": 3
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "manufacturer"
-                  },
-                  "val": {
-                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "reward_amount"
-                  },
-                  "val": {
-                    "u64": 30
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "waste_type"
-                  },
-                  "val": {
-                    "u32": 3
-                  }
-                }
-              ]
+              "bool": true
             }
           }
         }

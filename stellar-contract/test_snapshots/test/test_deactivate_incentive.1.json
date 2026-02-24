@@ -43,6 +43,9 @@
                 },
                 {
                   "u64": 25
+                },
+                {
+                  "u64": 6000
                 }
               ]
             }
@@ -112,6 +115,25 @@
                         "key": {
                           "vec": [
                             {
+                              "string": "general_incentives"
+                            },
+                            {
+                              "u32": 0
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u64": 1
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
                               "string": "incentive"
                             },
                             {
@@ -147,7 +169,23 @@
                             },
                             {
                               "key": {
-                                "symbol": "manufacturer"
+                                "symbol": "remaining_budget"
+                              },
+                              "val": {
+                                "u64": 6000
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "reward_points"
+                              },
+                              "val": {
+                                "u64": 25
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "rewarder"
                               },
                               "val": {
                                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -155,10 +193,10 @@
                             },
                             {
                               "key": {
-                                "symbol": "reward_amount"
+                                "symbol": "total_budget"
                               },
                               "val": {
-                                "u64": 25
+                                "u64": 6000
                               }
                             },
                             {
@@ -182,6 +220,25 @@
                         },
                         "val": {
                           "u64": 1
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "string": "rewarder_incentives"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u64": 1
+                            }
+                          ]
                         }
                       },
                       {
@@ -463,6 +520,9 @@
                 },
                 {
                   "u64": 25
+                },
+                {
+                  "u64": 6000
                 }
               ]
             }
@@ -514,7 +574,23 @@
                 },
                 {
                   "key": {
-                    "symbol": "manufacturer"
+                    "symbol": "remaining_budget"
+                  },
+                  "val": {
+                    "u64": 6000
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "reward_points"
+                  },
+                  "val": {
+                    "u64": 25
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "rewarder"
                   },
                   "val": {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -522,10 +598,10 @@
                 },
                 {
                   "key": {
-                    "symbol": "reward_amount"
+                    "symbol": "total_budget"
                   },
                   "val": {
-                    "u64": 25
+                    "u64": 6000
                   }
                 },
                 {
@@ -619,7 +695,23 @@
                 },
                 {
                   "key": {
-                    "symbol": "manufacturer"
+                    "symbol": "remaining_budget"
+                  },
+                  "val": {
+                    "u64": 6000
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "reward_points"
+                  },
+                  "val": {
+                    "u64": 25
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "rewarder"
                   },
                   "val": {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -627,10 +719,10 @@
                 },
                 {
                   "key": {
-                    "symbol": "reward_amount"
+                    "symbol": "total_budget"
                   },
                   "val": {
-                    "u64": 25
+                    "u64": 6000
                   }
                 },
                 {
@@ -663,7 +755,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "get_incentive"
+                "symbol": "get_incentive_by_id"
               }
             ],
             "data": {
@@ -686,7 +778,7 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "get_incentive"
+                "symbol": "get_incentive_by_id"
               }
             ],
             "data": {
@@ -717,7 +809,23 @@
                 },
                 {
                   "key": {
-                    "symbol": "manufacturer"
+                    "symbol": "remaining_budget"
+                  },
+                  "val": {
+                    "u64": 6000
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "reward_points"
+                  },
+                  "val": {
+                    "u64": 25
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "rewarder"
                   },
                   "val": {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -725,10 +833,10 @@
                 },
                 {
                   "key": {
-                    "symbol": "reward_amount"
+                    "symbol": "total_budget"
                   },
                   "val": {
-                    "u64": 25
+                    "u64": 6000
                   }
                 },
                 {
