@@ -260,6 +260,16 @@ impl omni-stellar-omni-stellar-scavengerContract {
         // Store participant using helper function
         Self::set_participant(&env, &address, &participant);
 
+        // Emit event
+        events::emit_participant_registered(
+            &env,
+            &address,
+            &role,
+            &name,
+            latitude,
+            longitude,
+        );
+
         participant
     }
 
