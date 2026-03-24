@@ -154,6 +154,21 @@ impl omni-stellar-omni-stellar-scavengerContract {
         }
     }
 
+    // ========== Reentrancy Guard Helper Functions ==========
+
+    /// Lock the reentrancy guard
+    fn lock(env: &Env) {
+        if env.storage().instance().has(&REENTRANCY_GUARD) {
+            panic!("Reentrant call detected");
+        }
+        env.storage().instance().set(&REENTRANCY_GUARD, &true);
+    }
+
+    /// Unlock the reentrancy guard
+    fn unlock(env: &Env) {
+        env.storage().instance().remove(&REENTRANCY_GUARD);
+    }
+
     // ========== Charity Contract Functions ==========
 
     /// Set the charity contract address (admin only)
@@ -1662,10 +1677,21 @@ impl omni-stellar-omni-stellar-scavengerContract {
         (total_wastes, total_weight, total_tokens)
     }
 
-    /// Get all incentive IDs for a specific rewarder/manufacturer
-    fn get_incentives_by_rewarder(env: Env, rewarder: Address) -> Vec<u64> {
+    /// Get all incentives created by a specific rewarder/manufacturer
+    /// Returns full Incentive structs for all incentives created by the rewarder
+    /// Returns empty vector if rewarder has no incentives
+    pub fn get_incentives_by_rewarder(env: Env, rewarder: Address) -> Vec<Incentive> {
         let key = ("rewarder_incentives", rewarder);
-        env.storage().instance().get(&key).unwrap_or(Vec::new(&env))
+        let incentive_ids: Vec<u64> = env.storage().instance().get(&key).unwrap_or(Vec::new(&env));
+        
+        let mut incentives = Vec::new(&env);
+        for incentive_id in incentive_ids.iter() {
+            if let Some(incentive) = Self::get_incentive_internal(&env, incentive_id) {
+                incentives.push_back(incentive);
+            }
+        }
+        
+        incentives
     }
 
     /// Get the active incentive with the highest reward for a specific manufacturer and waste type
