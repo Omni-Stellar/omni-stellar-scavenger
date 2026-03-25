@@ -85,26 +85,39 @@
                     "storage": [
                       {
                         "key": {
-                          "symbol": "ADMIN"
+                          "symbol": "ADMINS"
                         },
                         "val": {
-                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                          "vec": [
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                            }
+                          ]
                         }
                       },
                       {
                         "key": {
-                          "symbol": "COL_PCT"
+                          "symbol": "RWD_CFG"
                         },
                         "val": {
-                          "u32": 30
-                        }
-                      },
-                      {
-                        "key": {
-                          "symbol": "OWN_PCT"
-                        },
-                        "val": {
-                          "u32": 20
+                          "map": [
+                            {
+                              "key": {
+                                "symbol": "collector_percentage"
+                              },
+                              "val": {
+                                "u32": 30
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "owner_percentage"
+                              },
+                              "val": {
+                                "u32": 20
+                              }
+                            }
+                          ]
                         }
                       }
                     ]
@@ -362,7 +375,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Caller is not the contract admin' from contract function 'Symbol(obj#27)'"
+                  "string": "caught panic 'Caller is not the contract admin' from contract function 'Symbol(obj#39)'"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"

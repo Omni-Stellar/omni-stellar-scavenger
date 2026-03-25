@@ -178,7 +178,7 @@ fn test_deactivated_waste_not_counted_in_totals() {
 }
 
 #[test]
-#[should_panic(expected = "Cannot transfer deactivated waste")]
+#[should_panic(expected = "Error(Contract, #18)")]
 fn test_deactivated_waste_cannot_be_transferred() {
     let env = Env::default();
     env.mock_all_auths();
@@ -251,6 +251,15 @@ fn test_deactivated_waste_cannot_be_confirmed() {
 
     // Deactivate waste
     client.deactivate_waste(&waste_id, &admin);
+
+    // Register confirmer
+    client.register_participant(
+        &confirmer,
+        &ParticipantRole::Manufacturer,
+        &soroban_sdk::symbol_short!("Conf"),
+        &45_000_000,
+        &-93_000_000,
+    );
 
     // Try to confirm deactivated waste (should panic)
     client.confirm_waste_details(&waste_id, &confirmer);

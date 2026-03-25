@@ -1,5 +1,6 @@
 #![cfg(test)]
 
+
 use soroban_sdk::{testutils::Address as _, Address, Env};
 use stellar_scavngr_contract::{omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient};
 
@@ -170,9 +171,9 @@ fn test_get_percentages_not_set() {
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);
     let client = omni-stellar-omni-stellar-scavengerContractClient::new(&env, &contract_id);
 
-    // Get percentages before they're set
-    assert_eq!(client.get_collector_percentage(), None);
-    assert_eq!(client.get_owner_percentage(), None);
+    // Get percentages before they're set — returns defaults (5 and 50)
+    assert_eq!(client.get_collector_percentage(), Some(5));
+    assert_eq!(client.get_owner_percentage(), Some(50));
 }
 
 #[test]
