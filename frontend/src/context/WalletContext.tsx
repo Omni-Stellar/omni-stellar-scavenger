@@ -11,7 +11,7 @@ interface WalletContextType {
   error: string | null;
 }
 
-const WalletContext = createContext<WalletContextType | undefined>(undefined);
+const WalletContext = createContext<WalletContextType | undefined>(undefined)
 
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [address, setAddress] = useState<string | null>(localStorage.getItem('wallet_address'));
@@ -52,9 +52,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const msg = err?.message ?? '';
       setError(msg.includes('User declined') ? 'Connection rejected.' : 'Failed to connect wallet.');
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const disconnect = () => { setAddress(null); localStorage.removeItem('wallet_address'); };
 
@@ -62,9 +62,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     <WalletContext.Provider value={{ address, isConnected: !!address, isInstalled, connect, disconnect, isLoading: loading, error }}>
       {children}
     </WalletContext.Provider>
-  );
-};
+  )
+}
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useWallet = () => {
   const ctx = useContext(WalletContext);
   if (!ctx) throw new Error('useWallet must be used within a WalletProvider');
