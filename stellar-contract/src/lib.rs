@@ -23,6 +23,7 @@ const TOTAL_WEIGHT: Symbol = symbol_short!("TOT_WGT");
 const TOTAL_TOKENS: Symbol = symbol_short!("TOT_TKN");
 const REENTRANCY_GUARD: Symbol = symbol_short!("RE_GUARD");
 const TOKEN_ADDR: Symbol = symbol_short!("TKN_ADDR");
+const PART_INDEX: Symbol = symbol_short!("PART_IDX");
 const PAUSED: Symbol = symbol_short!("PAUSED");
 
 /// Reward distribution percentages stored as a single instance-storage entry.
@@ -576,6 +577,15 @@ impl omni-stellar-omni-stellar-scavengerContract {
         // Store participant using helper function
         Self::set_participant(&env, &address, &participant);
 
+        // Add to participant index
+        let mut participant_index: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&PART_INDEX)
+            .unwrap_or(Vec::new(&env));
+        participant_index.push_back(address.clone());
+        env.storage().instance().set(&PART_INDEX, &participant_index);
+
         // Emit event
         events::emit_participant_registered(
             &env,
@@ -1120,6 +1130,46 @@ impl omni-stellar-omni-stellar-scavengerContract {
         Some(ParticipantInfo { participant, stats })
     }
 
+    /// Get all registered participants with pagination
+    /// Returns a paginated list of participant addresses
+    /// 
+    /// # Arguments
+    /// * `offset` - Starting index (0-based)
+    /// * `limit` - Maximum number of results to return
+    /// 
+    /// # Returns
+    /// Vector of participant addresses, limited by the specified limit
+    /// Returns empty vector if offset is beyond the list size
+    pub fn get_all_participants(env: Env, offset: u32, limit: u32) -> Vec<Address> {
+        let participant_index: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&PART_INDEX)
+            .unwrap_or(Vec::new(&env));
+
+        let total_count = participant_index.len();
+        let mut result = Vec::new(&env);
+
+        // Return empty if offset is beyond the list
+        if offset >= total_count {
+            return result;
+        }
+
+        // Calculate the end index
+        let end = core::cmp::min(offset + limit, total_count);
+
+        // Collect addresses from offset to end
+        for i in offset..end {
+            if let Some(addr) = participant_index.get(i) {
+                result.push_back(addr);
+            }
+        }
+
+        result
+    }
+
+    /// Update participant role
+    /// Preserves registration timestamp and other data
     /// Change the role of a registered participant.
     ///
     /// All other fields (name, location, stats, timestamps) are preserved.
@@ -1176,6 +1226,21 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
         participant.is_registered = false;
         env.storage().instance().set(&key, &participant);
+
+        // Remove from participant index
+        let participant_index: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&PART_INDEX)
+            .unwrap_or(Vec::new(&env));
+        
+        let mut new_index = Vec::new(&env);
+        for addr in participant_index.iter() {
+            if addr != address {
+                new_index.push_back(addr);
+            }
+        }
+        env.storage().instance().set(&PART_INDEX, &new_index);
 
         participant
     }
