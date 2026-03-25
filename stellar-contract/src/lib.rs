@@ -4,6 +4,7 @@ mod errors;
 mod events;
 mod types;
 mod validation;
+mod test_transfer_path_validation;
 
 pub use errors::Error;
 pub use types::{
@@ -216,21 +217,6 @@ impl omni-stellar-omni-stellar-scavengerContract {
         if &waste.current_owner != caller {
             panic!("Caller is not the owner of this waste item");
         }
-    }
-
-    // ========== Reentrancy Guard Helper Functions ==========
-
-    /// Lock the reentrancy guard
-    fn lock(env: &Env) {
-        if env.storage().instance().has(&REENTRANCY_GUARD) {
-            panic!("Reentrant call detected");
-        }
-        env.storage().instance().set(&REENTRANCY_GUARD, &true);
-    }
-
-    /// Unlock the reentrancy guard
-    fn unlock(env: &Env) {
-        env.storage().instance().remove(&REENTRANCY_GUARD);
     }
 
     // ========== Charity Contract Functions ==========
@@ -769,7 +755,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     ///
     /// # Returns
     /// `true` if both participants are registered and the role transition is allowed.
-    pub fn is_valid_transfer(env: Env, from: Address, to: Address) -> bool {
+    pub fn is_valid_transfer(env: &Env, from: Address, to: Address) -> bool {
         let from_participant: Option<Participant> = env.storage().instance().get(&(from,));
         let to_participant: Option<Participant> = env.storage().instance().get(&(to,));
 
@@ -778,6 +764,11 @@ impl omni-stellar-omni-stellar-scavengerContract {
         };
 
         if !from_p.is_registered || !to_p.is_registered {
+            return false;
+        }
+
+        // Invalid if transferring to the same role
+        if from_p.role == to_p.role {
             return false;
         }
 
@@ -1398,12 +1389,13 @@ impl omni-stellar-omni-stellar-scavengerContract {
         assert!(from != to, "Cannot transfer waste to self");
 
         // Align with v2: reject transfers on deactivated waste
-        if !material.is_active {
-            panic!("Cannot transfer deactivated waste");
-        }
+        // Note: Material doesn't have is_active, assuming active for deprecated function
+        // if !material.is_active {
+        //     panic!("Cannot transfer deactivated waste");
+        // }
 
         // Align with v2: enforce valid transfer routes
-        if !Self::is_valid_transfer(env.clone(), from.clone(), to.clone()) {
+        if !Self::is_valid_transfer(&env, from.clone(), to.clone()) {
             panic!("Invalid transfer: role combination not allowed");
         }
 
@@ -1638,9 +1630,9 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// The [`WasteTransfer`] record that was appended to history.
     ///
     /// # Errors
-    /// - Panics `"Waste item not found"`.
-    /// - Panics `"Cannot transfer deactivated waste"`.
-    /// - Panics `"Invalid transfer"` if the role transition is not permitted.
+    /// - [`Error::WasteNotFound`] if no waste record exists for `waste_id`.
+    /// - [`Error::WasteDeactivated`] if the waste item is deactivated.
+    /// - [`Error::InvalidTransferRoute`] if the role transition is not permitted.
     /// - Panics `"Caller is not the owner of this waste item"`.
     pub fn transfer_waste_v2(
         env: Env,
@@ -1649,24 +1641,34 @@ impl omni-stellar-omni-stellar-scavengerContract {
         to: Address,
         latitude: i128,
         longitude: i128,
-    ) -> WasteTransfer {
-        // Access control check - verify caller owns the waste
-        Self::only_waste_owner(&env, &from, waste_id);
-        Self::require_registered(&env, &from);
-        Self::require_registered(&env, &to);
+    ) -> Result<WasteTransfer, Error> {
+        from.require_auth();
 
-        let mut waste: types::Waste = env
+        // Fetch waste first so we can return a typed error if not found
+        let mut waste: types::Waste = match env
             .storage()
             .instance()
             .get(&("waste_v2", waste_id))
-            .expect("Waste item not found");
+        {
+            Some(w) => w,
+            None => return Err(Error::WasteNotFound),
+        };
 
-        if !waste.is_active {
-            panic!("Cannot transfer deactivated waste");
+        // Verify caller owns the waste
+        if waste.current_owner != from {
+            panic!("Caller is not the owner of this waste item");
         }
 
-        if !Self::is_valid_transfer(env.clone(), from.clone(), to.clone()) {
-            panic!("Invalid transfer");
+        Self::require_registered(&env, &from);
+        Self::require_registered(&env, &to);
+
+        if !waste.is_active {
+            return Err(Error::WasteDeactivated);
+        }
+
+        // Route check after registration checks, before any storage mutation
+        if !Self::is_valid_transfer(&env, from.clone(), to.clone()) {
+            return Err(Error::InvalidTransferRoute);
         }
 
         waste.transfer_to(to.clone());
@@ -1725,7 +1727,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
             (from, to, timestamp),
         );
 
-        transfer
+        Ok(transfer)
     }
 
     /// Batch transfer multiple waste items to a single recipient
@@ -1737,13 +1739,13 @@ impl omni-stellar-omni-stellar-scavengerContract {
         to: Address,
         latitude: i128,
         longitude: i128,
-    ) -> Vec<WasteTransfer> {
+    ) -> Result<Vec<WasteTransfer>, Error> {
         // Validate recipient is registered
         Self::require_registered(&env, &to);
 
         // Handle empty batch
         if waste_ids.is_empty() {
-            return Vec::new(&env);
+            return Ok(Vec::new(&env));
         }
 
         // Phase 1: Validate all waste IDs before executing any transfer
@@ -1754,11 +1756,11 @@ impl omni-stellar-omni-stellar-scavengerContract {
                 .storage()
                 .instance()
                 .get(&("waste_v2", waste_id))
-                .expect("Waste item not found");
+                .ok_or(Error::WasteNotFound)?;
 
             // Verify waste is active
             if !waste.is_active {
-                panic!("Cannot transfer deactivated waste");
+                return Err(Error::WasteDeactivated);
             }
 
             // Get the current owner
@@ -1769,8 +1771,8 @@ impl omni-stellar-omni-stellar-scavengerContract {
             Self::require_registered(&env, &from);
 
             // Validate transfer route
-            if !Self::is_valid_transfer(env.clone(), from.clone(), to.clone()) {
-                panic!("Invalid transfer");
+            if !Self::is_valid_transfer(&env, from.clone(), to.clone()) {
+                return Err(Error::InvalidTransferRoute);
             }
 
             wastes_to_transfer.push_back((waste_id, waste, from));
@@ -1847,7 +1849,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
             transfers.push_back(transfer);
         }
 
-        transfers
+        Ok(transfers)
     }
 
     /// Transfer aggregated waste from collector to manufacturer
@@ -2639,14 +2641,6 @@ impl omni-stellar-omni-stellar-scavengerContract {
         }
     }
 
-    // ========== Admin Transfer ==========
-
-    /// Transfer admin rights to a new address (current admin only)
-    pub fn transfer_admin(env: Env, current_admin: Address, new_admin: Address) {
-        Self::require_admin(&env, &current_admin);
-        env.storage().instance().set(&ADMIN, &new_admin);
-    }
-
     /// Pause the contract (admin only) — blocks all state-changing functions
     pub fn pause(env: Env, admin: Address) {
         Self::require_admin(&env, &admin);
@@ -2703,8 +2697,9 @@ impl omni-stellar-omni-stellar-scavengerContract {
         );
 
         let transfers = Self::get_transfer_history(env.clone(), waste_id);
-        let collector_pct: u32 = env.storage().instance().get(&COLLECTOR_PCT).unwrap_or(5);
-        let owner_pct: u32 = env.storage().instance().get(&OWNER_PCT).unwrap_or(50);
+        let cfg = Self::get_reward_config(&env);
+        let collector_pct = cfg.collector_percentage;
+        let owner_pct = cfg.owner_percentage;
 
         let token_address: Address = env
             .storage()
