@@ -199,10 +199,32 @@
                     "storage": [
                       {
                         "key": {
-                          "symbol": "ADMIN"
+                          "symbol": "ADMINS"
                         },
                         "val": {
-                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                          "vec": [
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "symbol": "PART_IDX"
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                            }
+                          ]
                         }
                       },
                       {
@@ -1697,7 +1719,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Only waste owner can transfer' from contract function 'Symbol(obj#325)'"
+                  "string": "caught panic 'Only waste owner can transfer' from contract function 'Symbol(obj#367)'"
                 },
                 {
                   "u64": 1

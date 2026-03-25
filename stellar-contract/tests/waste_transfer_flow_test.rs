@@ -71,7 +71,8 @@ fn test_valid_transfer_collector_to_manufacturer() {
 }
 
 #[test]
-#[should_panic(expected = "Invalid transfer")]
+
+#[should_panic(expected = "Error(Contract, #27)")]
 fn test_invalid_transfer_collector_to_recycler() {
     let env = Env::default();
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);
@@ -93,7 +94,8 @@ fn test_invalid_transfer_collector_to_recycler() {
 }
 
 #[test]
-#[should_panic(expected = "Invalid transfer")]
+
+#[should_panic(expected = "Error(Contract, #27)")]
 fn test_invalid_transfer_manufacturer_to_collector() {
     let env = Env::default();
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);
@@ -136,7 +138,7 @@ fn test_non_owner_transfer_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Sender not registered")]
+#[should_panic(expected = "Participant not found")]
 fn test_transfer_from_unregistered_fails() {
     let env = Env::default();
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);
@@ -156,7 +158,7 @@ fn test_transfer_from_unregistered_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Receiver not registered")]
+#[should_panic(expected = "Participant not found")]
 fn test_transfer_to_unregistered_fails() {
     let env = Env::default();
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);

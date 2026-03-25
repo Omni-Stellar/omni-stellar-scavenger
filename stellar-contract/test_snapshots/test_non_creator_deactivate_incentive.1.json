@@ -199,10 +199,32 @@
                     "storage": [
                       {
                         "key": {
-                          "symbol": "ADMIN"
+                          "symbol": "ADMINS"
                         },
                         "val": {
-                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                          "vec": [
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "symbol": "PART_IDX"
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                            }
+                          ]
                         }
                       },
                       {
@@ -1641,7 +1663,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Only incentive creator can deactivate' from contract function 'Symbol(obj#309)'"
+                  "string": "caught panic 'Only incentive creator can deactivate' from contract function 'Symbol(obj#351)'"
                 },
                 {
                   "u64": 1

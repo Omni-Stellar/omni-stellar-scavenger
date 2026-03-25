@@ -153,10 +153,26 @@
                     "storage": [
                       {
                         "key": {
-                          "symbol": "ADMIN"
+                          "symbol": "ADMINS"
                         },
                         "val": {
-                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                          "vec": [
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "symbol": "PART_IDX"
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                            }
+                          ]
                         }
                       },
                       {
@@ -1150,7 +1166,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Caller is not a registered participant' from contract function 'Symbol(obj#183)'"
+                  "string": "caught panic 'Caller is not a registered participant' from contract function 'Symbol(obj#217)'"
                 },
                 {
                   "u32": 2
