@@ -280,6 +280,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     pub fn donate_to_charity(env: Env, donor: Address, amount: i128) {
         // Reentrancy guard
         Self::lock(&env);
+        Self::require_not_paused(&env);
         Self::only_registered(&env, &donor);
 
         // Validate amount
@@ -465,6 +466,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         Self::lock(&env);
 
         rewarder.require_auth();
+        Self::require_not_paused(&env);
 
         // Validate amount
         if amount <= 0 {
@@ -925,6 +927,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics `"Incentive not found"`.
     pub fn update_incentive_status(env: Env, incentive_id: u64, is_active: bool) -> Incentive {
+        Self::require_not_paused(&env);
         let mut incentive: Incentive =
             Self::get_incentive(&env, incentive_id).expect("Incentive not found");
 
@@ -963,6 +966,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         new_reward_points: u64,
         new_total_budget: u64,
     ) -> Incentive {
+        Self::require_not_paused(&env);
         // Step 1: Retrieve incentive (existence check)
         let mut incentive: Incentive =
             Self::get_incentive(&env, incentive_id).expect("Incentive not found");
@@ -1200,6 +1204,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// - Panics `"Participant not found"`.
     /// - Panics `"Participant is not registered"`.
     pub fn update_role(env: Env, address: Address, new_role: ParticipantRole) -> Participant {
+        Self::require_not_paused(&env);
         address.require_auth();
 
         let mut participant: Participant =
@@ -1230,6 +1235,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics `"Participant not found"`.
     pub fn deregister_participant(env: Env, address: Address) -> Participant {
+        Self::require_not_paused(&env);
         address.require_auth();
 
         let key = (address.clone(),);
@@ -1270,6 +1276,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         latitude: i128,
         longitude: i128,
     ) -> Participant {
+        Self::require_not_paused(&env);
         address.require_auth();
 
         validation::validate_coordinates(latitude, longitude);
@@ -1558,6 +1565,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         longitude: i128,
     ) -> u128 {
         // Validate recycler is registered
+        Self::require_not_paused(&env);
         Self::only_registered(&env, &recycler);
 
         if weight == 0 {
@@ -1651,6 +1659,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         longitude: i128,
     ) -> WasteTransfer {
         // Access control check - verify caller owns the waste
+        Self::require_not_paused(&env);
         Self::only_waste_owner(&env, &from, waste_id);
         Self::require_registered(&env, &from);
         Self::require_registered(&env, &to);
@@ -1739,6 +1748,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         longitude: i128,
     ) -> Vec<WasteTransfer> {
         // Validate recipient is registered
+        Self::require_not_paused(&env);
         Self::require_registered(&env, &to);
 
         // Handle empty batch
@@ -1880,6 +1890,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         notes: soroban_sdk::Symbol,
     ) -> u128 {
         collector.require_auth();
+        Self::require_not_paused(&env);
         Self::require_registered(&env, &collector);
         Self::require_registered(&env, &manufacturer);
 
@@ -2130,6 +2141,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         submitter: Address,
     ) -> soroban_sdk::Vec<Material> {
         // Validate submitter is registered
+        Self::require_not_paused(&env);
         Self::only_registered(&env, &submitter);
 
         let mut results = soroban_sdk::Vec::new(&env);
@@ -2269,6 +2281,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// - Panics `"Only recyclers can verify materials"`.
     /// - Panics `"Material not found"`.
     pub fn verify_material(env: Env, material_id: u64, verifier: Address) -> Material {
+        Self::require_not_paused(&env);
         verifier.require_auth();
 
         // Check if verifier is a recycler and is registered
@@ -2334,6 +2347,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         material_ids: soroban_sdk::Vec<u64>,
         verifier: Address,
     ) -> soroban_sdk::Vec<Material> {
+        Self::require_not_paused(&env);
         verifier.require_auth();
 
         // Check if verifier is a recycler and is registered
@@ -2554,6 +2568,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         material_id: u64,
         claimer: Address,
     ) -> i128 {
+        Self::require_not_paused(&env);
         Self::only_registered(&env, &claimer);
 
         let mut incentive =
