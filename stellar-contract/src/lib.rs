@@ -150,6 +150,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
             panic!("Admin list cannot be empty");
         }
         env.storage().instance().set(&ADMINS, &new_admins);
+        events::emit_admin_transferred(&env, &current_admin);
     }
 
     /// Add a new admin address (current admin only)
