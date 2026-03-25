@@ -220,19 +220,6 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
     // ========== Reentrancy Guard Helper Functions ==========
 
-    /// Lock the reentrancy guard
-    fn lock(env: &Env) {
-        if env.storage().instance().has(&REENTRANCY_GUARD) {
-            panic!("Reentrant call detected");
-        }
-        env.storage().instance().set(&REENTRANCY_GUARD, &true);
-    }
-
-    /// Unlock the reentrancy guard
-    fn unlock(env: &Env) {
-        env.storage().instance().remove(&REENTRANCY_GUARD);
-    }
-
     // ========== Charity Contract Functions ==========
 
     /// Set the charity contract address that receives donations.
@@ -1403,11 +1390,6 @@ impl omni-stellar-omni-stellar-scavengerContract {
         }
 
         assert!(from != to, "Cannot transfer waste to self");
-
-        // Align with v2: reject transfers on deactivated waste
-        if !material.is_active {
-            panic!("Cannot transfer deactivated waste");
-        }
 
         // Align with v2: enforce valid transfer routes
         if !Self::is_valid_transfer(env.clone(), from.clone(), to.clone()) {
@@ -2656,12 +2638,6 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
     // ========== Admin Transfer ==========
 
-    /// Transfer admin rights to a new address (current admin only)
-    pub fn transfer_admin(env: Env, current_admin: Address, new_admin: Address) {
-        Self::require_admin(&env, &current_admin);
-        env.storage().instance().set(&ADMIN, &new_admin);
-    }
-
     /// Pause the contract (admin only) — blocks all state-changing functions
     pub fn pause(env: Env, admin: Address) {
         Self::require_admin(&env, &admin);
@@ -2718,8 +2694,9 @@ impl omni-stellar-omni-stellar-scavengerContract {
         );
 
         let transfers = Self::get_transfer_history(env.clone(), waste_id);
-        let collector_pct: u32 = env.storage().instance().get(&COLLECTOR_PCT).unwrap_or(5);
-        let owner_pct: u32 = env.storage().instance().get(&OWNER_PCT).unwrap_or(50);
+        let cfg = Self::get_reward_config(&env);
+        let collector_pct: u32 = cfg.collector_percentage;
+        let owner_pct: u32 = cfg.owner_percentage;
 
         let token_address: Address = env
             .storage()
