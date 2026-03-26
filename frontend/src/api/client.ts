@@ -329,6 +329,10 @@ export class omni-stellar-omni-stellar-scavengerClient {
     ])
   }
 
+  async getParticipantWastes(address: string): Promise<number[]> {
+    return this.invoke<number[]>('get_participant_wastes', [new Address(address).toScVal()])
+  }
+
   async deactivateWaste(admin: string, wasteId: number, signer: string): Promise<void> {
     return this.invoke<void>(
       'deactivate_waste',
