@@ -5,6 +5,7 @@ import {
   Participant,
   Incentive,
   Material,
+  Waste,
   WasteTransfer,
   ParticipantStats,
   GlobalMetrics,
@@ -337,6 +338,10 @@ export class omni-stellar-omni-stellar-scavengerClient {
     ])
   }
 
+  async getParticipantWastes(address: string): Promise<number[]> {
+    return this.invoke<number[]>('get_participant_wastes', [new Address(address).toScVal()])
+  }
+
   async deactivateWaste(admin: string, wasteId: number, signer: string): Promise<void> {
     return this.invoke<void>(
       'deactivate_waste',
@@ -402,5 +407,17 @@ export class omni-stellar-omni-stellar-scavengerClient {
 
   async getSupplyChainStats(): Promise<[bigint, bigint, bigint]> {
     return this.invoke<[bigint, bigint, bigint]>('get_supply_chain_stats', [])
+  }
+
+  async getParticipantWastes(address: string): Promise<number[]> {
+    return this.invoke<number[]>('get_participant_wastes', [new Address(address).toScVal()])
+  }
+
+  async getParticipantWastesV2(address: string): Promise<bigint[]> {
+    return this.invoke<bigint[]>('get_participant_wastes_v2', [new Address(address).toScVal()])
+  }
+
+  async getWasteV2(wasteId: bigint): Promise<Waste | null> {
+    return this.invoke<Waste | null>('get_waste_v2', [nativeToScVal(wasteId, { type: 'u128' })])
   }
 }
