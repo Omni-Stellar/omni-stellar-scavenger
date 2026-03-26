@@ -384,6 +384,12 @@ export class omni-stellar-omni-stellar-scavengerClient {
     ])
   }
 
+  async getWasteTransferHistoryV2(wasteId: bigint): Promise<WasteTransfer[]> {
+    return this.invoke<WasteTransfer[]>('get_waste_transfer_history_v2', [
+      nativeToScVal(wasteId, { type: 'u128' })
+    ])
+  }
+
   async distributeRewards(
     wasteId: number,
     incentiveId: number,
