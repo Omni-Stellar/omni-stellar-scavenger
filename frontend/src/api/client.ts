@@ -5,6 +5,7 @@ import {
   Participant,
   Incentive,
   Material,
+  Waste,
   WasteTransfer,
   ParticipantStats,
   GlobalMetrics,
@@ -281,6 +282,14 @@ export class omni-stellar-omni-stellar-scavengerClient {
     ])
   }
 
+  async getIncentives(wasteType: WasteType): Promise<Incentive[]> {
+    return this.invoke<Incentive[]>('get_incentives', [nativeToScVal(wasteType)])
+  }
+
+  async getAllActiveIncentives(): Promise<Incentive[]> {
+    return this.invoke<Incentive[]>('get_active_incentives', [])
+  }
+
   async updateIncentive(
     incentiveId: number,
     newRewardPoints: bigint,
@@ -327,6 +336,10 @@ export class omni-stellar-omni-stellar-scavengerClient {
     return this.invoke<Material | null>('get_material', [
       nativeToScVal(materialId, { type: 'u64' })
     ])
+  }
+
+  async getParticipantWastes(address: string): Promise<number[]> {
+    return this.invoke<number[]>('get_participant_wastes', [new Address(address).toScVal()])
   }
 
   async deactivateWaste(admin: string, wasteId: number, signer: string): Promise<void> {
@@ -402,5 +415,11 @@ export class omni-stellar-omni-stellar-scavengerClient {
 
   async getActiveIncentives(): Promise<Incentive[]> {
     return this.invoke<Incentive[]>('get_active_incentives', [])
+  async getParticipantWastesV2(address: string): Promise<bigint[]> {
+    return this.invoke<bigint[]>('get_participant_wastes_v2', [new Address(address).toScVal()])
+  }
+
+  async getWasteV2(wasteId: bigint): Promise<Waste | null> {
+    return this.invoke<Waste | null>('get_waste_v2', [nativeToScVal(wasteId, { type: 'u128' })])
   }
 }
