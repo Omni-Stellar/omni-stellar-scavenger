@@ -419,6 +419,8 @@ export class omni-stellar-omni-stellar-scavengerClient {
     return this.invoke<number[]>('get_participant_wastes', [new Address(address).toScVal()])
   }
 
+  async getActiveIncentives(): Promise<Incentive[]> {
+    return this.invoke<Incentive[]>('get_active_incentives', [])
   async getParticipantWastesV2(address: string): Promise<bigint[]> {
     return this.invoke<bigint[]>('get_participant_wastes_v2', [new Address(address).toScVal()])
   }

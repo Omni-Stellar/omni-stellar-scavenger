@@ -5,6 +5,7 @@ import { LandingPage } from '@/pages/LandingPage'
 import { HomePage } from '@/pages/HomePage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { RecyclerDashboard } from '@/pages/RecyclerDashboard'
 import { IncentivesPage } from '@/pages/IncentivesPage'
 import { WasteListPage } from '@/pages/WasteListPage'
 import { ManufacturerDashboardPage } from '@/pages/ManufacturerDashboardPage'
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
       { path: 'incentives', element: <div>Incentives</div> },
       { path: 'transfer', element: <div>Transfer</div> },
       { path: 'history', element: <div>History</div> },
+      { path: 'dashboard/recycler', element: <RecyclerDashboard /> },
       { path: 'wastes', element: <WasteListPage /> },
       { path: 'manufacturer', element: <ManufacturerDashboardPage /> },
     ],
