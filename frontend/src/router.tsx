@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { AppShell } from '@/components/layout/AppShell'
 import { HomePage } from '@/pages/HomePage'
+import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 function ProtectedLayout() {
@@ -12,24 +13,17 @@ function ProtectedLayout() {
       <Outlet />
     </AppShell>
   ) : (
-    <Navigate to="/" replace />
+    <Navigate to="/login" replace />
   )
 }
 
 export const router = createBrowserRouter([
+  { path: '/', element: <Navigate to="/login" replace /> },
+  { path: '/login', element: <LoginPage /> },
   {
-    // Public: home is accessible to everyone (wallet connect / login)
-    path: '/',
-    element: (
-      <AppShell>
-        <HomePage />
-      </AppShell>
-    ),
-  },
-  {
-    // Protected routes share AppShell and require authentication
     element: <ProtectedLayout />,
     children: [
+      { path: 'dashboard', element: <HomePage /> },
       { path: 'submit', element: <div>Submit Waste</div> },
       { path: 'collect', element: <div>Collect</div> },
       { path: 'incentives', element: <div>Incentives</div> },
