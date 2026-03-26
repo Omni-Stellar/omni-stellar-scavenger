@@ -4,6 +4,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { HomePage } from '@/pages/HomePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { ManufacturerDashboardPage } from '@/pages/ManufacturerDashboardPage'
+import { CollectorDashboardPage } from '@/pages/CollectorDashboardPage'
 
 function ProtectedLayout() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -32,7 +33,7 @@ export const router = createBrowserRouter([
     element: <ProtectedLayout />,
     children: [
       { path: 'submit', element: <div>Submit Waste</div> },
-      { path: 'collect', element: <div>Collect</div> },
+      { path: 'collect', element: <CollectorDashboardPage /> },
       { path: 'incentives', element: <div>Incentives</div> },
       { path: 'transfer', element: <div>Transfer</div> },
       { path: 'history', element: <div>History</div> },
