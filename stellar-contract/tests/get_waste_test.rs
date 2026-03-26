@@ -1,6 +1,4 @@
 #![cfg(test)]
-
-
 use soroban_sdk::{testutils::Address as _, Address, Env, String};
 use stellar_scavngr_contract::{omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType};
 
