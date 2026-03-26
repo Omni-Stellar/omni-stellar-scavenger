@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
 const NAV_LINKS = [
-  { label: 'Dashboard', href: '/', roles: ['Recycler', 'Collector', 'Manufacturer'] },
+  { label: 'Dashboard', href: '/dashboard', roles: ['Recycler', 'Collector', 'Manufacturer'] },
   { label: 'Submit Waste', href: '/submit', roles: ['Recycler'] },
   { label: 'Collect', href: '/collect', roles: ['Collector'] },
   { label: 'Incentives', href: '/incentives', roles: ['Manufacturer'] },
