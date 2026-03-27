@@ -4,6 +4,7 @@ import { useWallet } from '@/context/WalletContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { WasteType, Material } from '@/api/types'
 import { formatTokenAmount, wasteTypeLabel, formatDate, formatAddress } from '@/lib/helpers'
 import { Coins, ArrowDownToLine, Package, BarChart3 } from 'lucide-react'
@@ -141,7 +142,11 @@ export function CollectorDashboardPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           {pendingTransfers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No pending transfers.</p>
+            <EmptyState
+              icon={ArrowDownToLine}
+              title="No pending transfers"
+              description="Transfers heading your way will appear here"
+            />
           ) : (
             pendingTransfers.map((m) => (
               <WasteRow key={m.id} material={m} onTransfer={handleTransfer} />
@@ -157,7 +162,11 @@ export function CollectorDashboardPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           {collectedWastes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No collected wastes yet.</p>
+            <EmptyState
+              icon={Package}
+              title="No collected wastes"
+              description="Collected waste items will appear here"
+            />
           ) : (
             collectedWastes.map((m) => (
               <WasteRow key={m.id} material={m} onTransfer={handleTransfer} />
