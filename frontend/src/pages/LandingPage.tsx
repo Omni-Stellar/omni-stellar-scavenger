@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Recycle, Truck, Factory, Github, Twitter } from 'lucide-react'
+import { Recycle, Truck, Factory } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useSupplyChainStats } from '@/hooks/useSupplyChainStats'
 import { useAppTitle } from '@/hooks/useAppTitle'
@@ -23,8 +23,8 @@ const STEPS = [
 ]
 
 const FOOTER_LINKS = [
-  { label: 'GitHub', href: 'https://github.com', icon: Github },
-  { label: 'Twitter', href: 'https://twitter.com', icon: Twitter },
+  { label: 'GitHub', href: 'https://github.com' },
+  { label: 'Twitter', href: 'https://twitter.com' },
 ]
 
 export function LandingPage() {
@@ -118,7 +118,7 @@ export function LandingPage() {
             Scavngr
           </div>
           <div className="flex gap-4">
-            {FOOTER_LINKS.map(({ label, href, icon: Icon }) => (
+            {FOOTER_LINKS.map(({ label, href }) => (
               <a
                 key={label}
                 href={href}
@@ -126,7 +126,6 @@ export function LandingPage() {
                 rel="noreferrer"
                 className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
-                <Icon className="h-4 w-4" />
                 {label}
               </a>
             ))}
