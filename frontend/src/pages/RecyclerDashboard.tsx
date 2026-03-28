@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { StatCardSkeleton } from '@/components/ui/Skeletons'
 import { AddressDisplay } from '@/components/ui/AddressDisplay'
 import { RegisterWasteModal } from '@/components/modals/RegisterWasteModal'
+import { TransferWasteModal } from '@/components/modals/TransferWasteModal'
 import { useAuth } from '@/context/AuthContext'
 import { useAppTitle } from '@/hooks/useAppTitle'
 import { omni-stellar-omni-stellar-scavengerClient } from '@/api/client'
@@ -51,6 +52,7 @@ export function RecyclerDashboard() {
   const [incentives, setIncentives] = useState<Incentive[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [transferWasteId, setTransferWasteId] = useState<bigint | null>(null)
 
   const load = useCallback(async () => {
     if (!address) return
@@ -154,7 +156,18 @@ export function RecyclerDashboard() {
                     </p>
                     <p className="text-xs text-muted-foreground">{m.weight} kg</p>
                   </div>
-                  <Badge variant={statusVariant(m)}>{statusLabel(m)}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={statusVariant(m)}>{statusLabel(m)}</Badge>
+                    {m.is_active && !m.is_confirmed && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setTransferWasteId(BigInt(m.id))}
+                      >
+                        Transfer
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -208,6 +221,14 @@ export function RecyclerDashboard() {
         onClose={() => setModalOpen(false)}
         onSuccess={() => { setModalOpen(false); load() }}
       />
+
+      {transferWasteId !== null && (
+        <TransferWasteModal
+          open
+          wasteId={transferWasteId}
+          onClose={() => { setTransferWasteId(null); load() }}
+        />
+      )}
     </div>
   )
 }
