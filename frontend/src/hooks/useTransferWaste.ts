@@ -3,7 +3,7 @@ import { omni-stellar-omni-stellar-scavengerClient } from '@/api/client'
 import { useWallet } from '@/context/WalletContext'
 import { useContract } from '@/context/ContractContext'
 import { networkConfig } from '@/lib/stellar'
-import { isValidAddress } from '@stellar/stellar-sdk'
+import { StrKey } from '@stellar/stellar-sdk'
 
 export interface TransferWasteParams {
   wasteId: bigint
@@ -18,7 +18,7 @@ export function useTransferWaste() {
   return useMutation({
     mutationFn: async ({ wasteId, to }: TransferWasteParams) => {
       if (!address) throw new Error('Wallet not connected.')
-      if (!isValidAddress(to)) throw new Error('Invalid recipient address.')
+      if (!StrKey.isValidEd25519PublicKey(to)) throw new Error('Invalid recipient address.')
       if (to === address) throw new Error('Cannot transfer waste to yourself.')
 
       const client = new omni-stellar-omni-stellar-scavengerClient({
@@ -27,7 +27,7 @@ export function useTransferWaste() {
         contractId: config.contractId,
       })
 
-      await client.transferWaste(Number(wasteId), address, to, address)
+      await client.transferWaste(wasteId, address, to, 0n, 0n, '', address)
       return to
     },
     onSuccess: (_to, { wasteId }) => {
