@@ -171,4 +171,13 @@ pub enum Error {
 
     /// (31) Insufficient budget for the reward.
     InsufficientBudget = 31,
+
+    /// (32) The waste item is frozen due to an open dispute.
+    WasteFrozen = 32,
+
+    /// (33) A dispute already exists for this waste item.
+    DisputeAlreadyExists = 33,
+
+    /// (34) No dispute record found for the given ID.
+    DisputeNotFound = 34,
 }

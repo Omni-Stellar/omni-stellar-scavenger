@@ -507,6 +507,8 @@ pub struct Waste {
     pub is_confirmed: bool,
     /// Address of the confirmer/verifier
     pub confirmer: Address,
+    /// Whether the waste is frozen due to an open dispute
+    pub is_frozen: bool,
 }
 
 impl Waste {
@@ -534,6 +536,7 @@ impl Waste {
             is_active,
             is_confirmed,
             confirmer,
+            is_frozen: false,
         }
     }
 
@@ -710,6 +713,7 @@ impl WasteBuilder {
             is_active: self.is_active,
             is_confirmed: self.is_confirmed,
             confirmer,
+            is_frozen: false,
         }
     }
 }
@@ -1323,5 +1327,37 @@ pub struct GlobalMetrics {
     pub total_wastes_count: u64,
     /// Total amount of tokens earned across all participants
     pub total_tokens_earned: u128,
+}
+
+/// Status of a waste dispute.
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DisputeStatus {
+    /// Dispute filed, awaiting admin review
+    Pending = 0,
+    /// Admin resolved in favour of the disputer
+    Resolved = 1,
+    /// Admin rejected the dispute
+    Rejected = 2,
+}
+
+/// A dispute raised against a waste item.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Dispute {
+    /// Unique dispute ID
+    pub id: u64,
+    /// The waste item under dispute
+    pub waste_id: u128,
+    /// Address that raised the dispute
+    pub disputer: Address,
+    /// Free-text reason (max 500 chars)
+    pub reason: soroban_sdk::String,
+    /// Current status
+    pub status: DisputeStatus,
+    /// Admin resolution note (empty until resolved/rejected)
+    pub resolution: soroban_sdk::String,
+    /// Ledger timestamp when dispute was created
+    pub created_at: u64,
 }
 

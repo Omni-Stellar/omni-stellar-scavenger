@@ -115,3 +115,19 @@ pub fn emit_contract_paused(env: &Env, admin: &Address) {
 pub fn emit_contract_unpaused(env: &Env, admin: &Address) {
     env.events().publish((symbol_short!("unpaused"),), admin);
 }
+
+/// Emit event when a dispute is created.
+pub fn emit_dispute_created(env: &Env, dispute_id: u64, waste_id: u128, disputer: &Address) {
+    env.events().publish(
+        (symbol_short!("disp_new"), dispute_id),
+        (waste_id, disputer),
+    );
+}
+
+/// Emit event when a dispute is resolved or rejected.
+pub fn emit_dispute_resolved(env: &Env, dispute_id: u64, accepted: bool, admin: &Address) {
+    env.events().publish(
+        (symbol_short!("disp_res"), dispute_id),
+        (accepted, admin),
+    );
+}

@@ -8,8 +8,8 @@ mod test_transfer_path_validation;
 
 pub use errors::Error;
 pub use types::{
-    GlobalMetrics, Incentive, Material, ParticipantRole, RecyclingStats, TransferItemType,
-    TransferRecord, TransferStatus, Waste, WasteTransfer, WasteType,
+    Dispute, DisputeStatus, GlobalMetrics, Incentive, Material, ParticipantRole, RecyclingStats,
+    TransferItemType, TransferRecord, TransferStatus, Waste, WasteTransfer, WasteType,
 };
 
 use soroban_sdk::{
@@ -27,6 +27,7 @@ const REENTRANCY_GUARD: Symbol = symbol_short!("RE_GUARD");
 const TOKEN_ADDR: Symbol = symbol_short!("TKN_ADDR");
 const PART_INDEX: Symbol = symbol_short!("PART_IDX");
 const PAUSED: Symbol = symbol_short!("PAUSED");
+const DISPUTE_CNT: Symbol = symbol_short!("DISP_CNT");
 
 /// Maximum allowed waste weight per submission (1 000 000 kg in grams).
 const MAX_WASTE_WEIGHT: u128 = 1_000_000_000;
@@ -1746,6 +1747,10 @@ impl omni-stellar-omni-stellar-scavengerContract {
             return Err(Error::WasteDeactivated);
         }
 
+        if waste.is_frozen {
+            return Err(Error::WasteFrozen);
+        }
+
         // Route check after registration checks, before any storage mutation
         if !Self::is_valid_transfer(&env, from.clone(), to.clone()) {
             return Err(Error::InvalidTransferRoute);
@@ -2713,6 +2718,174 @@ impl omni-stellar-omni-stellar-scavengerContract {
         Self::set_incentive(&env, incentive_id, &incentive);
 
         incentive
+    }
+
+    // ========== Dispute Resolution ==========
+
+    fn next_dispute_id(env: &Env) -> u64 {
+        let count: u64 = env.storage().instance().get(&DISPUTE_CNT).unwrap_or(0);
+        let next = count + 1;
+        env.storage().instance().set(&DISPUTE_CNT, &next);
+        next
+    }
+
+    /// Raise a dispute against a waste item.
+    ///
+    /// Freezes the waste so it cannot be transferred until the dispute is resolved.
+    /// Only registered participants may file a dispute.
+    ///
+    /// # Parameters
+    /// - `disputer`: Registered participant raising the dispute. Must sign.
+    /// - `waste_id`: v2 waste item under dispute.
+    /// - `reason`: Free-text reason (max 500 chars).
+    ///
+    /// # Returns
+    /// The newly created [`Dispute`].
+    ///
+    /// # Errors
+    /// - Panics `"Waste not found"`.
+    /// - Panics `"Waste is not active"`.
+    /// - Panics `"Waste already has an open dispute"`.
+    /// - Panics `"Reason exceeds 500 characters"`.
+    pub fn create_dispute(
+        env: Env,
+        disputer: Address,
+        waste_id: u128,
+        reason: soroban_sdk::String,
+    ) -> Dispute {
+        Self::require_not_paused(&env);
+        Self::only_registered(&env, &disputer);
+
+        if reason.len() > 500 {
+            panic!("Reason exceeds 500 characters");
+        }
+
+        let mut waste: types::Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", waste_id))
+            .expect("Waste not found");
+
+        if !waste.is_active {
+            panic!("Waste is not active");
+        }
+        if waste.is_frozen {
+            panic!("Waste already has an open dispute");
+        }
+
+        // Freeze the waste
+        waste.is_frozen = true;
+        env.storage().instance().set(&("waste_v2", waste_id), &waste);
+
+        let dispute_id = Self::next_dispute_id(&env);
+        let dispute = Dispute {
+            id: dispute_id,
+            waste_id,
+            disputer: disputer.clone(),
+            reason,
+            status: DisputeStatus::Pending,
+            resolution: soroban_sdk::String::from_str(&env, ""),
+            created_at: env.ledger().timestamp(),
+        };
+
+        env.storage()
+            .instance()
+            .set(&("dispute", dispute_id), &dispute);
+
+        events::emit_dispute_created(&env, dispute_id, waste_id, &disputer);
+
+        dispute
+    }
+
+    /// Resolve or reject a dispute (admin only).
+    ///
+    /// Unfreezes the waste. If `accepted` is true the status becomes `Resolved`;
+    /// otherwise `Rejected`.
+    ///
+    /// # Parameters
+    /// - `admin`: Contract admin. Must sign.
+    /// - `dispute_id`: ID of the dispute to resolve.
+    /// - `accepted`: `true` = Resolved, `false` = Rejected.
+    /// - `resolution`: Admin note explaining the decision.
+    ///
+    /// # Returns
+    /// The updated [`Dispute`].
+    ///
+    /// # Errors
+    /// - Panics `"Dispute not found"`.
+    /// - Panics `"Dispute is not pending"`.
+    pub fn resolve_dispute(
+        env: Env,
+        admin: Address,
+        dispute_id: u64,
+        accepted: bool,
+        resolution: soroban_sdk::String,
+    ) -> Dispute {
+        Self::only_admin(&env, &admin);
+        Self::require_not_paused(&env);
+
+        let mut dispute: Dispute = env
+            .storage()
+            .instance()
+            .get(&("dispute", dispute_id))
+            .expect("Dispute not found");
+
+        if dispute.status != DisputeStatus::Pending {
+            panic!("Dispute is not pending");
+        }
+
+        dispute.status = if accepted {
+            DisputeStatus::Resolved
+        } else {
+            DisputeStatus::Rejected
+        };
+        dispute.resolution = resolution;
+
+        // Unfreeze the waste
+        if let Some(mut waste) = env
+            .storage()
+            .instance()
+            .get::<_, types::Waste>(&("waste_v2", dispute.waste_id))
+        {
+            waste.is_frozen = false;
+            env.storage()
+                .instance()
+                .set(&("waste_v2", dispute.waste_id), &waste);
+        }
+
+        env.storage()
+            .instance()
+            .set(&("dispute", dispute_id), &dispute);
+
+        events::emit_dispute_resolved(&env, dispute_id, accepted, &admin);
+
+        dispute
+    }
+
+    /// Get a dispute by ID.
+    pub fn get_dispute(env: Env, dispute_id: u64) -> Option<Dispute> {
+        env.storage().instance().get(&("dispute", dispute_id))
+    }
+
+    /// Get all disputes filtered by status.
+    ///
+    /// # Returns
+    /// `Vec<Dispute>` matching the given [`DisputeStatus`].
+    pub fn get_disputes(env: Env, status: DisputeStatus) -> Vec<Dispute> {
+        let count: u64 = env.storage().instance().get(&DISPUTE_CNT).unwrap_or(0);
+        let mut result = Vec::new(&env);
+        for i in 1..=count {
+            if let Some(d) = env
+                .storage()
+                .instance()
+                .get::<_, Dispute>(&("dispute", i))
+            {
+                if d.status == status {
+                    result.push_back(d);
+                }
+            }
+        }
+        result
     }
 
     // ========== Global Metrics ==========
