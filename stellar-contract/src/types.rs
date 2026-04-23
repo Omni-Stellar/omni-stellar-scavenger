@@ -1516,3 +1516,35 @@ pub struct SeasonalMultiplier {
     pub end: u64,
 }
 
+/// Status of a waste dispute.
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DisputeStatus {
+    /// Dispute filed, awaiting admin review
+    Pending = 0,
+    /// Admin resolved in favour of the disputer
+    Resolved = 1,
+    /// Admin rejected the dispute
+    Rejected = 2,
+}
+
+/// A dispute raised against a waste item.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Dispute {
+    /// Unique dispute ID
+    pub id: u64,
+    /// The waste item under dispute
+    pub waste_id: u128,
+    /// Address that raised the dispute
+    pub disputer: Address,
+    /// Free-text reason (max 500 chars)
+    pub reason: soroban_sdk::String,
+    /// Current status
+    pub status: DisputeStatus,
+    /// Admin resolution note (empty until resolved/rejected)
+    pub resolution: soroban_sdk::String,
+    /// Ledger timestamp when dispute was created
+    pub created_at: u64,
+}
+
