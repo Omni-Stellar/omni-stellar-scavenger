@@ -1129,12 +1129,8 @@ impl omni-stellar-omni-stellar-scavengerContract {
             return 0;
         }
 
-        // Calculate reward: (weight in kg) * reward_points
-        let weight_kg = waste_amount / 1000;
-        let reward = weight_kg * incentive.reward_points;
-        
-        // Exact reward calculation instead of capping
-        reward
+        // Use tiered or flat reward calculation
+        incentive.calculate_reward(waste_amount)
     }
 
     /// Get all active incentives for a specific waste type, sorted by reward descending.
@@ -2917,6 +2913,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
             reward_points,
             total_budget,
             env.ledger().timestamp(),
+            &env,
         );
 
         // Store incentive
@@ -3033,172 +3030,86 @@ impl omni-stellar-omni-stellar-scavengerContract {
         incentive
     }
 
-    // ========== Dispute Resolution ==========
-
-    fn next_dispute_id(env: &Env) -> u64 {
-        let count: u64 = env.storage().instance().get(&DISPUTE_CNT).unwrap_or(0);
-        let next = count + 1;
-        env.storage().instance().set(&DISPUTE_CNT, &next);
-        next
-    }
-
-    /// Raise a dispute against a waste item.
+    /// Set tiered reward structure for an incentive (max 5 tiers).
     ///
-    /// Freezes the waste so it cannot be transferred until the dispute is resolved.
-    /// Only registered participants may file a dispute.
+    /// Tiers must be sorted by `min_weight_kg` ascending, non-overlapping,
+    /// and contiguous (each tier's `min_weight_kg` must equal the previous
+    /// tier's `max_weight_kg`). Only the original `rewarder` may call this.
     ///
     /// # Parameters
-    /// - `disputer`: Registered participant raising the dispute. Must sign.
-    /// - `waste_id`: v2 waste item under dispute.
-    /// - `reason`: Free-text reason (max 500 chars).
+    /// - `incentive_id`: ID of the incentive to update.
+    /// - `rewarder`: Original creator. Must sign.
+    /// - `tiers`: Vec of up to 5 [`IncentiveTier`] entries.
     ///
     /// # Returns
-    /// The newly created [`Dispute`].
+    /// The updated [`Incentive`].
     ///
     /// # Errors
-    /// - Panics `"Waste not found"`.
-    /// - Panics `"Waste is not active"`.
-    /// - Panics `"Waste already has an open dispute"`.
-    /// - Panics `"Reason exceeds 500 characters"`.
-    pub fn create_dispute(
+    /// - Panics `"Incentive not found"`.
+    /// - Panics `"Only incentive creator can set tiers"`.
+    /// - Panics `"Incentive is not active"`.
+    /// - Panics `"Maximum 5 tiers allowed"`.
+    /// - Panics `"Tiers cannot be empty"`.
+    /// - Panics `"Tier reward_points must be greater than zero"`.
+    /// - Panics `"Tiers must be sorted by min_weight_kg ascending"`.
+    /// - Panics `"Tier ranges must not overlap"`.
+    /// - Panics `"Last tier must be unbounded (max_weight_kg == 0)"`.
+    pub fn set_incentive_tiers(
         env: Env,
-        disputer: Address,
-        waste_id: u128,
-        reason: soroban_sdk::String,
-    ) -> Dispute {
+        incentive_id: u64,
+        rewarder: Address,
+        tiers: soroban_sdk::Vec<IncentiveTier>,
+    ) -> Incentive {
         Self::require_not_paused(&env);
-        Self::only_registered(&env, &disputer);
+        rewarder.require_auth();
+        Self::require_registered(&env, &rewarder);
 
-        if reason.len() > 500 {
-            panic!("Reason exceeds 500 characters");
+        let mut incentive =
+            Self::get_incentive_internal(&env, incentive_id).expect("Incentive not found");
+
+        if incentive.rewarder != rewarder {
+            panic!("Only incentive creator can set tiers");
+        }
+        if !incentive.active {
+            panic!("Incentive is not active");
+        }
+        if tiers.is_empty() {
+            panic!("Tiers cannot be empty");
+        }
+        if tiers.len() > 5 {
+            panic!("Maximum 5 tiers allowed");
         }
 
-        let mut waste: types::Waste = env
-            .storage()
-            .instance()
-            .get(&("waste_v2", waste_id))
-            .expect("Waste not found");
-
-        if !waste.is_active {
-            panic!("Waste is not active");
-        }
-        if waste.is_frozen {
-            panic!("Waste already has an open dispute");
-        }
-
-        // Freeze the waste
-        waste.is_frozen = true;
-        env.storage().instance().set(&("waste_v2", waste_id), &waste);
-
-        let dispute_id = Self::next_dispute_id(&env);
-        let dispute = Dispute {
-            id: dispute_id,
-            waste_id,
-            disputer: disputer.clone(),
-            reason,
-            status: DisputeStatus::Pending,
-            resolution: soroban_sdk::String::from_str(&env, ""),
-            created_at: env.ledger().timestamp(),
-        };
-
-        env.storage()
-            .instance()
-            .set(&("dispute", dispute_id), &dispute);
-
-        events::emit_dispute_created(&env, dispute_id, waste_id, &disputer);
-
-        dispute
-    }
-
-    /// Resolve or reject a dispute (admin only).
-    ///
-    /// Unfreezes the waste. If `accepted` is true the status becomes `Resolved`;
-    /// otherwise `Rejected`.
-    ///
-    /// # Parameters
-    /// - `admin`: Contract admin. Must sign.
-    /// - `dispute_id`: ID of the dispute to resolve.
-    /// - `accepted`: `true` = Resolved, `false` = Rejected.
-    /// - `resolution`: Admin note explaining the decision.
-    ///
-    /// # Returns
-    /// The updated [`Dispute`].
-    ///
-    /// # Errors
-    /// - Panics `"Dispute not found"`.
-    /// - Panics `"Dispute is not pending"`.
-    pub fn resolve_dispute(
-        env: Env,
-        admin: Address,
-        dispute_id: u64,
-        accepted: bool,
-        resolution: soroban_sdk::String,
-    ) -> Dispute {
-        Self::only_admin(&env, &admin);
-        Self::require_not_paused(&env);
-
-        let mut dispute: Dispute = env
-            .storage()
-            .instance()
-            .get(&("dispute", dispute_id))
-            .expect("Dispute not found");
-
-        if dispute.status != DisputeStatus::Pending {
-            panic!("Dispute is not pending");
-        }
-
-        dispute.status = if accepted {
-            DisputeStatus::Resolved
-        } else {
-            DisputeStatus::Rejected
-        };
-        dispute.resolution = resolution;
-
-        // Unfreeze the waste
-        if let Some(mut waste) = env
-            .storage()
-            .instance()
-            .get::<_, types::Waste>(&("waste_v2", dispute.waste_id))
-        {
-            waste.is_frozen = false;
-            env.storage()
-                .instance()
-                .set(&("waste_v2", dispute.waste_id), &waste);
-        }
-
-        env.storage()
-            .instance()
-            .set(&("dispute", dispute_id), &dispute);
-
-        events::emit_dispute_resolved(&env, dispute_id, accepted, &admin);
-
-        dispute
-    }
-
-    /// Get a dispute by ID.
-    pub fn get_dispute(env: Env, dispute_id: u64) -> Option<Dispute> {
-        env.storage().instance().get(&("dispute", dispute_id))
-    }
-
-    /// Get all disputes filtered by status.
-    ///
-    /// # Returns
-    /// `Vec<Dispute>` matching the given [`DisputeStatus`].
-    pub fn get_disputes(env: Env, status: DisputeStatus) -> Vec<Dispute> {
-        let count: u64 = env.storage().instance().get(&DISPUTE_CNT).unwrap_or(0);
-        let mut result = Vec::new(&env);
-        for i in 1..=count {
-            if let Some(d) = env
-                .storage()
-                .instance()
-                .get::<_, Dispute>(&("dispute", i))
-            {
-                if d.status == status {
-                    result.push_back(d);
+        // Validate each tier and ordering
+        let mut prev_max: u64 = 0;
+        for i in 0..tiers.len() {
+            let tier = tiers.get(i).unwrap();
+            if tier.reward_points == 0 {
+                panic!("Tier reward_points must be greater than zero");
+            }
+            if tier.min_weight_kg < prev_max {
+                panic!("Tier ranges must not overlap");
+            }
+            if tier.min_weight_kg != prev_max {
+                panic!("Tiers must be sorted by min_weight_kg ascending");
+            }
+            // Last tier must be unbounded
+            if i == tiers.len() - 1 && tier.max_weight_kg != 0 {
+                panic!("Last tier must be unbounded (max_weight_kg == 0)");
+            }
+            // Non-last tiers must have max > min
+            if i < tiers.len() - 1 {
+                if tier.max_weight_kg == 0 || tier.max_weight_kg <= tier.min_weight_kg {
+                    panic!("Tier ranges must not overlap");
                 }
+                prev_max = tier.max_weight_kg;
             }
         }
-        result
+
+        incentive.tiers = tiers;
+        Self::set_incentive(&env, incentive_id, &incentive);
+
+        incentive
     }
 
     // ========== Global Metrics ==========
@@ -3303,8 +3214,6 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
         let transfers = Self::get_transfer_history(env.clone(), waste_id);
         let cfg = Self::get_reward_config(&env);
-        let collector_pct: u32 = cfg.collector_percentage;
-        let owner_pct: u32 = cfg.owner_percentage;
         let collector_pct = cfg.collector_percentage;
         let owner_pct = cfg.owner_percentage;
 
