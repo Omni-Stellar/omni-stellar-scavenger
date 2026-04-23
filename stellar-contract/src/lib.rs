@@ -2,22 +2,20 @@
 
 mod errors;
 mod events;
+mod test_transfer_path_validation;
 mod types;
 mod validation;
-mod test_transfer_path_validation;
 
 pub use errors::Error;
 pub use types::{
-    GlobalMetrics, Incentive, Material, ParticipantRole, ProcessingRecord, ProcessingStatus,
-    RecyclingStats, SeasonalMultiplier, TransferItemType, TransferRecord, TransferStatus, Waste,
-    WasteTransfer, WasteType,
+    GlobalMetrics, GradeRecord, Incentive, Material, ParticipantRole, RecyclingStats,
+    TransferItemType, TransferRecord, TransferStatus, Waste, WasteGrade, WasteTransfer, WasteType,
 };
 pub use types::calculate_carbon_credits;
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env, String, Symbol, Vec,
+    contract, contractimpl, contracttype, symbol_short, token, Address, Env, String, Symbol, Vec,
 };
-
 
 // Storage keys
 const ADMINS: Symbol = symbol_short!("ADMINS");
@@ -29,25 +27,32 @@ const REENTRANCY_GUARD: Symbol = symbol_short!("RE_GUARD");
 const TOKEN_ADDR: Symbol = symbol_short!("TKN_ADDR");
 const PART_INDEX: Symbol = symbol_short!("PART_IDX");
 const PAUSED: Symbol = symbol_short!("PAUSED");
-const SEASONAL_MUL: Symbol = symbol_short!("SEAS_MUL");
-const TOTAL_CARBON: Symbol = symbol_short!("TOT_CRBN");
-const CONTAMINATED_LIST: Symbol = symbol_short!("CONT_LST");
+const MULTISIG_THRESHOLD: Symbol = symbol_short!("MS_THRESH");
+const PROPOSAL_COUNT: Symbol = symbol_short!("PROP_CNT");
 
-// ── Reputation constants ──────────────────────────────────────────────────────
-const REP_MIN: i128 = -1000;
-const REP_MAX: i128 = 10_000;
-/// Points awarded for a verified waste submission
-const REP_VERIFY: i128 = 10;
-/// Points awarded for a successful waste transfer
-const REP_TRANSFER: i128 = 5;
-/// Points awarded for confirming waste details
-const REP_CONFIRM: i128 = 3;
-/// Points deducted for a rejected/failed action
-const REP_PENALTY: i128 = -15;
-/// Seconds in 30 days — inactivity window for decay
-const DECAY_WINDOW_SECS: u64 = 30 * 24 * 3600;
-/// Decay amount applied per inactive window
-const DECAY_AMOUNT: i128 = 10;
+/// 7 days in seconds
+const PROPOSAL_TTL_SECS: u64 = 7 * 24 * 60 * 60;
+
+/// Actions that require multi-sig approval.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AdminAction {
+    TransferAdmin(Vec<Address>),
+    SetPercentages(u32, u32),
+    DeactivateWaste(u128),
+}
+
+/// A pending multi-sig proposal.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminProposal {
+    pub id: u64,
+    pub action: AdminAction,
+    pub proposer: Address,
+    pub approvers: Vec<Address>,
+    pub executed: bool,
+    pub created_at: u64,
+}
 
 /// Maximum allowed waste weight per submission (1 000 000 kg in grams).
 const MAX_WASTE_WEIGHT: u128 = 1_000_000_000;
@@ -156,7 +161,10 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics `"Admin not set"` if [`initialize_admin`] has not been called.
     pub fn get_admins(env: Env) -> Vec<Address> {
-        env.storage().instance().get(&ADMINS).expect("Admin not set")
+        env.storage()
+            .instance()
+            .get(&ADMINS)
+            .expect("Admin not set")
     }
 
     /// Get the primary admin address (first in the list).
@@ -167,7 +175,10 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics `"Admin not set"` if [`initialize_admin`] has not been called.
     pub fn get_admin(env: Env) -> Address {
-        Self::get_admins(env).first().expect("No admin found").clone()
+        Self::get_admins(env)
+            .first()
+            .expect("No admin found")
+            .clone()
     }
 
     /// Transfer admin rights to new addresses (current admin only)
@@ -185,7 +196,11 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// Add a new admin address (current admin only)
     pub fn add_admin(env: Env, current_admin: Address, new_admin: Address) {
         Self::require_admin(&env, &current_admin);
-        let mut admins: Vec<Address> = env.storage().instance().get(&ADMINS).expect("Admin not set");
+        let mut admins: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&ADMINS)
+            .expect("Admin not set");
         if !admins.contains(&new_admin) {
             admins.push_back(new_admin);
             env.storage().instance().set(&ADMINS, &admins);
@@ -196,7 +211,11 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// Cannot remove the last admin.
     pub fn remove_admin(env: Env, current_admin: Address, admin_to_remove: Address) {
         Self::require_admin(&env, &current_admin);
-        let mut admins: Vec<Address> = env.storage().instance().get(&ADMINS).expect("Admin not set");
+        let admins: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&ADMINS)
+            .expect("Admin not set");
         if admins.len() <= 1 {
             panic!("Cannot remove the last admin");
         }
@@ -215,7 +234,11 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
     /// Check if caller is admin
     fn require_admin(env: &Env, caller: &Address) {
-        let admins: Vec<Address> = env.storage().instance().get(&ADMINS).expect("Admin not set");
+        let admins: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&ADMINS)
+            .expect("Admin not set");
 
         if !admins.contains(caller) {
             panic!("Unauthorized: caller is not admin");
@@ -224,19 +247,18 @@ impl omni-stellar-omni-stellar-scavengerContract {
         caller.require_auth();
     }
 
-
     // ========== Access Control Helper Functions ==========
 
     /// Verify that the caller is a registered participant
     /// Panics with "Caller is not a registered participant" if not registered
     fn only_registered(env: &Env, caller: &Address) {
         caller.require_auth();
-        
+
         let key = (caller.clone(),);
         let participant: Option<Participant> = env.storage().instance().get(&key);
-        
+
         match participant {
-            Some(p) if p.is_registered => {},
+            Some(p) if p.is_registered => {}
             Some(_) => panic!("Caller is not a registered participant"),
             None => panic!("Caller is not a registered participant"),
         }
@@ -247,18 +269,18 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// Panics with "Caller is not a registered participant" if not registered
     fn only_manufacturer(env: &Env, caller: &Address) {
         caller.require_auth();
-        
+
         let key = (caller.clone(),);
         let participant: Participant = env
             .storage()
             .instance()
             .get(&key)
             .expect("Caller is not a registered participant");
-        
+
         if !participant.is_registered {
             panic!("Caller is not a registered participant");
         }
-        
+
         if !participant.role.can_manufacture() {
             panic!("Caller is not a manufacturer");
         }
@@ -280,13 +302,13 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// Panics with "Contract admin has not been set" if admin not configured
     fn only_admin(env: &Env, caller: &Address) {
         caller.require_auth();
-        
+
         let admins: Vec<Address> = env
             .storage()
             .instance()
             .get(&ADMINS)
             .expect("Contract admin has not been set");
-        
+
         if !admins.contains(caller) {
             panic!("Caller is not the contract admin");
         }
@@ -297,13 +319,13 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// Panics with "Waste item not found" if waste doesn't exist
     fn only_waste_owner(env: &Env, caller: &Address, waste_id: u128) {
         caller.require_auth();
-        
+
         let waste: Waste = env
             .storage()
             .instance()
             .get(&("waste_v2", waste_id))
             .expect("Waste item not found");
-        
+
         if &waste.current_owner != caller {
             panic!("Caller is not the owner of this waste item");
         }
@@ -330,7 +352,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// - Panics `"Caller is not the contract admin"` if `admin` is not the admin.
     pub fn set_charity_contract(env: Env, admin: Address, charity_address: Address) {
         Self::only_admin(&env, &admin);
-        
+
         // Validate address (basic check - address should not be the zero address)
         // In Soroban, we can't easily check for zero address, but we can ensure it's different from admin
         if charity_address == admin {
@@ -448,7 +470,10 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
         env.storage().instance().set(
             &REWARD_CFG,
-            &RewardConfig { collector_percentage, owner_percentage },
+            &RewardConfig {
+                collector_percentage,
+                owner_percentage,
+            },
         );
     }
 
@@ -715,13 +740,15 @@ impl omni-stellar-omni-stellar-scavengerContract {
             .get(&PART_INDEX)
             .unwrap_or(Vec::new(&env));
         participant_index.push_back(address.clone());
-        env.storage().instance().set(&PART_INDEX, &participant_index);
+        env.storage()
+            .instance()
+            .set(&PART_INDEX, &participant_index);
 
         // Emit event
         events::emit_participant_registered(
             &env,
             &address,
-            role.clone(),
+            role,
             name.clone(),
             latitude,
             longitude,
@@ -760,15 +787,9 @@ impl omni-stellar-omni-stellar-scavengerContract {
         }
     }
 
-
-
     /// Helper to distribute token rewards and emit events through the supply chain.
     /// Batches reads and merges writes to minimise storage round-trips.
-    fn _reward_tokens(
-        env: &Env,
-        waste_id: u64,
-        total_reward: u128,
-    ) {
+    fn _reward_tokens(env: &Env, waste_id: u64, total_reward: u128) {
         if total_reward == 0 {
             return;
         }
@@ -807,21 +828,27 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
             if submitter_total > 0 {
                 let key = (material.submitter.clone(),);
-                if let Some(mut participant) = env.storage().instance().get::<_, Participant>(&key) {
+                if let Some(mut participant) = env.storage().instance().get::<_, Participant>(&key)
+                {
                     participant.total_tokens_earned = participant
                         .total_tokens_earned
-                        .checked_add(submitter_total as u128)
+                        .checked_add(submitter_total)
                         .expect("Overflow in total_tokens_earned");
                     env.storage().instance().set(&key, &participant);
                 }
 
                 // Single global-tokens update for the submitter's combined share
-                Self::add_to_total_tokens(env, submitter_total as u128);
+                Self::add_to_total_tokens(env, submitter_total);
 
                 // Emit two events to preserve existing behaviour / test expectations
                 events::emit_tokens_rewarded(env, &material.submitter, owner_share, waste_id);
                 if recycler_amount > 0 {
-                    events::emit_tokens_rewarded(env, &material.submitter, recycler_amount, waste_id);
+                    events::emit_tokens_rewarded(
+                        env,
+                        &material.submitter,
+                        recycler_amount,
+                        waste_id,
+                    );
                 }
             }
         }
@@ -1103,7 +1130,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         // Step 5: Update fields (atomic)
         incentive.reward_points = new_reward_points;
         incentive.total_budget = new_total_budget;
-        
+
         // Adjust remaining budget based on new total budget
         if new_total_budget > budget_used {
             incentive.remaining_budget = new_total_budget - budget_used;
@@ -1118,7 +1145,11 @@ impl omni-stellar-omni-stellar-scavengerContract {
         // Step 7: Emit event
         env.events().publish(
             (symbol_short!("inc_upd"), incentive_id),
-            (incentive.rewarder.clone(), new_reward_points, new_total_budget)
+            (
+                incentive.rewarder.clone(),
+                new_reward_points,
+                new_total_budget,
+            ),
         );
 
         incentive
@@ -1138,21 +1169,18 @@ impl omni-stellar-omni-stellar-scavengerContract {
     ///
     /// # Errors
     /// - Panics `"Incentive not found"`.
-    pub fn calculate_incentive_reward(
-        env: Env,
-        incentive_id: u64,
-        waste_amount: u64,
-    ) -> u64 {
-        let incentive: Incentive = Self::get_incentive(&env, incentive_id)
-            .expect("Incentive not found");
+    pub fn calculate_incentive_reward(env: Env, incentive_id: u64, waste_amount: u64) -> u64 {
+        let incentive: Incentive =
+            Self::get_incentive(&env, incentive_id).expect("Incentive not found");
 
         // Check if incentive is active
         if !incentive.active {
             return 0;
         }
 
-        // Use tiered or flat reward calculation
-        incentive.calculate_reward(waste_amount)
+        // Calculate reward: (weight in kg) * reward_points
+        let weight_kg = waste_amount / 1000;
+        weight_kg * incentive.reward_points
     }
 
     /// Get all active incentives for a specific waste type, sorted by reward descending.
@@ -1253,11 +1281,11 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
     /// Get all registered participants with pagination
     /// Returns a paginated list of participant addresses
-    /// 
+    ///
     /// # Arguments
     /// * `offset` - Starting index (0-based)
     /// * `limit` - Maximum number of results to return
-    /// 
+    ///
     /// # Returns
     /// Vector of participant addresses, limited by the specified limit
     /// Returns empty vector if offset is beyond the list size
@@ -1356,7 +1384,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
             .instance()
             .get(&PART_INDEX)
             .unwrap_or(Vec::new(&env));
-        
+
         let mut new_index = Vec::new(&env);
         for addr in participant_index.iter() {
             if addr != address {
@@ -1429,10 +1457,14 @@ impl omni-stellar-omni-stellar-scavengerContract {
     pub fn get_transfer_history(env: Env, waste_id: u64) -> Vec<WasteTransfer> {
         // Check v2 storage first (uses u128 waste_id)
         let v2_key = ("transfer_history", waste_id as u128);
-        if let Some(history) = env.storage().instance().get::<_, Vec<WasteTransfer>>(&v2_key) {
+        if let Some(history) = env
+            .storage()
+            .instance()
+            .get::<_, Vec<WasteTransfer>>(&v2_key)
+        {
             return history;
         }
-        
+
         // Fall back to v1 storage
         let key = ("transfers", waste_id);
         env.storage().instance().get(&key).unwrap_or(Vec::new(&env))
@@ -1855,11 +1887,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         Self::require_addresses_different(&from, &to);
 
         // Fetch waste first so we can return a typed error if not found
-        let mut waste: types::Waste = match env
-            .storage()
-            .instance()
-            .get(&("waste_v2", waste_id))
-        {
+        let mut waste: types::Waste = match env.storage().instance().get(&("waste_v2", waste_id)) {
             Some(w) => w,
             None => return Err(Error::WasteNotFound),
         };
@@ -1976,8 +2004,9 @@ impl omni-stellar-omni-stellar-scavengerContract {
         }
 
         // Phase 1: Validate all waste IDs before executing any transfer
-        let mut wastes_to_transfer: soroban_sdk::Vec<(u128, types::Waste, Address)> = soroban_sdk::Vec::new(&env);
-        
+        let mut wastes_to_transfer: soroban_sdk::Vec<(u128, types::Waste, Address)> =
+            soroban_sdk::Vec::new(&env);
+
         for waste_id in waste_ids.iter() {
             let waste: types::Waste = env
                 .storage()
@@ -2275,11 +2304,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// - Panics `"Waste item not found"`.
     /// - Panics `"Waste is not confirmed"`.
     /// - Panics `"Caller is not the owner of this waste item"`.
-    pub fn reset_waste_confirmation(
-        env: Env,
-        waste_id: u128,
-        owner: Address,
-    ) -> types::Waste {
+    pub fn reset_waste_confirmation(env: Env, waste_id: u128, owner: Address) -> types::Waste {
         Self::require_not_paused(&env);
         // Access control check - verify caller owns the waste
         Self::only_waste_owner(&env, &owner, waste_id);
@@ -2323,11 +2348,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics `"Waste item not found"`.
     /// - Panics `"Waste already deactivated"`.
-    pub fn deactivate_waste(
-        env: Env,
-        waste_id: u128,
-        admin: Address,
-    ) -> types::Waste {
+    pub fn deactivate_waste(env: Env, waste_id: u128, admin: Address) -> types::Waste {
         Self::only_admin(&env, &admin);
 
         let mut waste: types::Waste = env
@@ -2854,14 +2875,14 @@ impl omni-stellar-omni-stellar-scavengerContract {
     pub fn get_incentives_by_rewarder(env: Env, rewarder: Address) -> Vec<Incentive> {
         let key = ("rewarder_incentives", rewarder);
         let incentive_ids: Vec<u64> = env.storage().instance().get(&key).unwrap_or(Vec::new(&env));
-        
+
         let mut incentives = Vec::new(&env);
         for incentive_id in incentive_ids.iter() {
             if let Some(incentive) = Self::get_incentive_internal(&env, incentive_id) {
                 incentives.push_back(incentive);
             }
         }
-        
+
         incentives
     }
 
@@ -2882,7 +2903,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         // Get all incentives for this manufacturer
         let key = ("rewarder_incentives", manufacturer.clone());
         let incentive_ids: Vec<u64> = env.storage().instance().get(&key).unwrap_or(Vec::new(&env));
-        
+
         let mut best_incentive: Option<Incentive> = None;
         let mut highest_reward: u64 = 0;
 
@@ -3064,86 +3085,467 @@ impl omni-stellar-omni-stellar-scavengerContract {
         incentive
     }
 
-    /// Set tiered reward structure for an incentive (max 5 tiers).
-    ///
-    /// Tiers must be sorted by `min_weight_kg` ascending, non-overlapping,
-    /// and contiguous (each tier's `min_weight_kg` must equal the previous
-    /// tier's `max_weight_kg`). Only the original `rewarder` may call this.
-    ///
-    /// # Parameters
-    /// - `incentive_id`: ID of the incentive to update.
-    /// - `rewarder`: Original creator. Must sign.
-    /// - `tiers`: Vec of up to 5 [`IncentiveTier`] entries.
-    ///
-    /// # Returns
-    /// The updated [`Incentive`].
-    ///
-    /// # Errors
-    /// - Panics `"Incentive not found"`.
-    /// - Panics `"Only incentive creator can set tiers"`.
-    /// - Panics `"Incentive is not active"`.
-    /// - Panics `"Maximum 5 tiers allowed"`.
-    /// - Panics `"Tiers cannot be empty"`.
-    /// - Panics `"Tier reward_points must be greater than zero"`.
-    /// - Panics `"Tiers must be sorted by min_weight_kg ascending"`.
-    /// - Panics `"Tier ranges must not overlap"`.
-    /// - Panics `"Last tier must be unbounded (max_weight_kg == 0)"`.
-    pub fn set_incentive_tiers(
+    // ========== Waste Quality Grading ==========
+
+    /// Assign a quality grade to a v2 waste item.
+    /// Only registered `Collector` or `Manufacturer` participants may grade.
+    pub fn set_waste_grade(
         env: Env,
-        incentive_id: u64,
-        rewarder: Address,
-        tiers: soroban_sdk::Vec<IncentiveTier>,
-    ) -> Incentive {
+        waste_id: u128,
+        grade: WasteGrade,
+        grader: Address,
+    ) -> types::Waste {
         Self::require_not_paused(&env);
-        rewarder.require_auth();
-        Self::require_registered(&env, &rewarder);
+        grader.require_auth();
+        Self::require_registered(&env, &grader);
 
-        let mut incentive =
-            Self::get_incentive_internal(&env, incentive_id).expect("Incentive not found");
+        let grader_key = (grader.clone(),);
+        let grader_participant: Participant = env
+            .storage()
+            .instance()
+            .get(&grader_key)
+            .expect("Caller is not a registered participant");
 
-        if incentive.rewarder != rewarder {
-            panic!("Only incentive creator can set tiers");
-        }
-        if !incentive.active {
-            panic!("Incentive is not active");
-        }
-        if tiers.is_empty() {
-            panic!("Tiers cannot be empty");
-        }
-        if tiers.len() > 5 {
-            panic!("Maximum 5 tiers allowed");
+        if grader_participant.role == ParticipantRole::Recycler {
+            panic!("Only collectors or manufacturers can grade waste");
         }
 
-        // Validate each tier and ordering
-        let mut prev_max: u64 = 0;
-        for i in 0..tiers.len() {
-            let tier = tiers.get(i).unwrap();
-            if tier.reward_points == 0 {
-                panic!("Tier reward_points must be greater than zero");
-            }
-            if tier.min_weight_kg < prev_max {
-                panic!("Tier ranges must not overlap");
-            }
-            if tier.min_weight_kg != prev_max {
-                panic!("Tiers must be sorted by min_weight_kg ascending");
-            }
-            // Last tier must be unbounded
-            if i == tiers.len() - 1 && tier.max_weight_kg != 0 {
-                panic!("Last tier must be unbounded (max_weight_kg == 0)");
-            }
-            // Non-last tiers must have max > min
-            if i < tiers.len() - 1 {
-                if tier.max_weight_kg == 0 || tier.max_weight_kg <= tier.min_weight_kg {
-                    panic!("Tier ranges must not overlap");
+        let mut waste: types::Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", waste_id))
+            .expect("Waste not found");
+
+        if !waste.is_active {
+            panic!("Waste is deactivated");
+        }
+
+        waste.grade = grade;
+        env.storage()
+            .instance()
+            .set(&("waste_v2", waste_id), &waste);
+
+        let history_key = ("grade_history", waste_id);
+        let mut history: Vec<types::GradeRecord> = env
+            .storage()
+            .instance()
+            .get(&history_key)
+            .unwrap_or(Vec::new(&env));
+        history.push_back(types::GradeRecord {
+            waste_id,
+            grade,
+            grader: grader.clone(),
+            graded_at: env.ledger().timestamp(),
+        });
+        env.storage().instance().set(&history_key, &history);
+
+        let stats_key = ("stats", grader.clone());
+        let mut stats: RecyclingStats = env
+            .storage()
+            .instance()
+            .get(&stats_key)
+            .unwrap_or_else(|| RecyclingStats::new(grader.clone()));
+        stats.record_grade(grade);
+        env.storage().instance().set(&stats_key, &stats);
+
+        events::emit_waste_graded(&env, waste_id, grade, &grader);
+
+        waste
+    }
+
+    /// Get the full grade history for a waste item.
+    pub fn get_grade_history(env: Env, waste_id: u128) -> Vec<types::GradeRecord> {
+        env.storage()
+            .instance()
+            .get(&("grade_history", waste_id))
+            .unwrap_or(Vec::new(&env))
+    }
+
+    /// Get all active v2 waste IDs with a specific grade.
+    pub fn get_wastes_by_grade(env: Env, grade: WasteGrade) -> Vec<u128> {
+        let mut result = Vec::new(&env);
+        let count = Self::get_waste_count(&env);
+        for waste_id in 1..=count {
+            if let Some(waste) = env
+                .storage()
+                .instance()
+                .get::<_, types::Waste>(&("waste_v2", waste_id as u128))
+            {
+                if waste.is_active && waste.grade == grade {
+                    result.push_back(waste_id as u128);
                 }
-                prev_max = tier.max_weight_kg;
+            }
+        }
+        result
+    }
+
+    /// Apply the grade multiplier to a base reward: `base * grade.multiplier_pct() / 100`.
+    pub fn apply_grade_multiplier(base_reward: u64, grade: WasteGrade) -> u64 {
+        base_reward * grade.multiplier_pct() / 100
+    }
+
+    // ========== Waste Category Tags ==========
+
+    const MAX_TAGS: u32 = 10;
+    const MAX_TAG_LEN: u32 = 20;
+
+    /// Normalise a tag: validate length, lowercase ASCII bytes, return new String.
+    fn normalise_tag(env: &Env, tag: &String) -> String {
+        let len = tag.len();
+        if len == 0 {
+            panic!("Tag cannot be empty");
+        }
+        if len > Self::MAX_TAG_LEN {
+            panic!("Tag exceeds maximum length of 20 characters");
+        }
+        let mut buf = [0u8; 20];
+        tag.copy_into_slice(&mut buf[..len as usize]);
+        for b in buf[..len as usize].iter_mut() {
+            if *b >= b'A' && *b <= b'Z' {
+                *b += 32;
+            }
+        }
+        String::from_bytes(env, &buf[..len as usize])
+    }
+
+    /// Add a tag to a v2 waste item. Tags are normalised to lowercase. Duplicates ignored.
+    /// Max 10 tags; max 20 chars each. Only the current owner may add tags.
+    pub fn add_waste_tag(env: Env, waste_id: u128, tag: String, caller: Address) -> types::Waste {
+        Self::require_not_paused(&env);
+        caller.require_auth();
+        Self::require_registered(&env, &caller);
+
+        let mut waste: types::Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", waste_id))
+            .expect("Waste not found");
+
+        if !waste.is_active {
+            panic!("Waste is deactivated");
+        }
+        if waste.current_owner != caller {
+            panic!("Only the waste owner can add tags");
+        }
+        if waste.tags.len() >= Self::MAX_TAGS {
+            panic!("Tag limit reached");
+        }
+
+        let normalised = Self::normalise_tag(&env, &tag);
+        for existing in waste.tags.iter() {
+            if existing == normalised {
+                return waste;
             }
         }
 
-        incentive.tiers = tiers;
-        Self::set_incentive(&env, incentive_id, &incentive);
+        waste.tags.push_back(normalised);
+        env.storage()
+            .instance()
+            .set(&("waste_v2", waste_id), &waste);
+        waste
+    }
 
-        incentive
+    /// Remove a tag from a v2 waste item. Case-insensitive. No-op if absent.
+    /// Only the current owner may remove tags.
+    pub fn remove_waste_tag(
+        env: Env,
+        waste_id: u128,
+        tag: String,
+        caller: Address,
+    ) -> types::Waste {
+        Self::require_not_paused(&env);
+        caller.require_auth();
+        Self::require_registered(&env, &caller);
+
+        let mut waste: types::Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", waste_id))
+            .expect("Waste not found");
+
+        if waste.current_owner != caller {
+            panic!("Only the waste owner can remove tags");
+        }
+
+        let normalised = Self::normalise_tag(&env, &tag);
+        let mut new_tags: Vec<String> = Vec::new(&env);
+        for existing in waste.tags.iter() {
+            if existing != normalised {
+                new_tags.push_back(existing);
+            }
+        }
+        waste.tags = new_tags;
+        env.storage()
+            .instance()
+            .set(&("waste_v2", waste_id), &waste);
+        waste
+    }
+
+    /// Get all active v2 waste IDs that have a specific tag (case-insensitive).
+    pub fn get_wastes_by_tag(env: Env, tag: String) -> Vec<u128> {
+        let normalised = Self::normalise_tag(&env, &tag);
+        let mut result = Vec::new(&env);
+        let count = Self::get_waste_count(&env);
+        for waste_id in 1..=count {
+            if let Some(waste) = env
+                .storage()
+                .instance()
+                .get::<_, types::Waste>(&("waste_v2", waste_id as u128))
+            {
+                if waste.is_active {
+                    for t in waste.tags.iter() {
+                        if t == normalised {
+                            result.push_back(waste_id as u128);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    // ========== Waste Image / Document Hashes ==========
+
+    const MAX_DOCUMENT_HASHES: u32 = 5;
+
+    /// Validate that `hash` is a plausible IPFS CID (starts with "Qm" or "bafy").
+    fn validate_ipfs_hash(env: &Env, hash: &String) {
+        let len = hash.len() as usize;
+        if !(4..=128).contains(&len) {
+            panic!("Invalid IPFS hash");
+        }
+        let mut buf = [0u8; 128];
+        hash.copy_into_slice(&mut buf[..len]);
+        let starts_qm = buf[0] == b'Q' && buf[1] == b'm';
+        let starts_bafy = buf[0] == b'b' && buf[1] == b'a' && buf[2] == b'f' && buf[3] == b'y';
+        if !starts_qm && !starts_bafy {
+            panic!("Invalid IPFS hash");
+        }
+        let _ = env;
+    }
+
+    /// Set (or replace) the primary image hash for a v2 waste item. Owner only.
+    pub fn set_waste_image(
+        env: Env,
+        waste_id: u128,
+        hash: String,
+        caller: Address,
+    ) -> types::Waste {
+        Self::require_not_paused(&env);
+        caller.require_auth();
+        Self::require_registered(&env, &caller);
+
+        let mut waste: types::Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", waste_id))
+            .expect("Waste not found");
+
+        if !waste.is_active {
+            panic!("Waste is deactivated");
+        }
+        if waste.current_owner != caller {
+            panic!("Only the waste owner can set image hash");
+        }
+
+        Self::validate_ipfs_hash(&env, &hash);
+        waste.image_hash = Some(hash);
+        env.storage()
+            .instance()
+            .set(&("waste_v2", waste_id), &waste);
+        waste
+    }
+
+    /// Add a document hash to a v2 waste item (max 5). Owner only.
+    pub fn add_waste_document(
+        env: Env,
+        waste_id: u128,
+        hash: String,
+        caller: Address,
+    ) -> types::Waste {
+        Self::require_not_paused(&env);
+        caller.require_auth();
+        Self::require_registered(&env, &caller);
+
+        let mut waste: types::Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", waste_id))
+            .expect("Waste not found");
+
+        if !waste.is_active {
+            panic!("Waste is deactivated");
+        }
+        if waste.current_owner != caller {
+            panic!("Only the waste owner can add document hashes");
+        }
+        if waste.document_hashes.len() >= Self::MAX_DOCUMENT_HASHES {
+            panic!("Document hash limit reached");
+        }
+
+        Self::validate_ipfs_hash(&env, &hash);
+        waste.document_hashes.push_back(hash);
+        env.storage()
+            .instance()
+            .set(&("waste_v2", waste_id), &waste);
+        waste
+    }
+
+    // ========== Multi-Signature Admin Operations ==========
+
+    /// Set the number of admin approvals required to execute a proposal (1 ≤ threshold ≤ admin count).
+    pub fn set_multisig_threshold(env: Env, admin: Address, threshold: u32) {
+        Self::require_admin(&env, &admin);
+        let admins: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&ADMINS)
+            .expect("Admin not set");
+        if threshold == 0 || threshold > admins.len() {
+            panic!("Threshold must be between 1 and the number of admins");
+        }
+        env.storage()
+            .instance()
+            .set(&MULTISIG_THRESHOLD, &threshold);
+    }
+
+    /// Get the current multi-sig threshold (defaults to 1).
+    pub fn get_multisig_threshold(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&MULTISIG_THRESHOLD)
+            .unwrap_or(1)
+    }
+
+    fn next_proposal_id(env: &Env) -> u64 {
+        let id: u64 = env.storage().instance().get(&PROPOSAL_COUNT).unwrap_or(0) + 1;
+        env.storage().instance().set(&PROPOSAL_COUNT, &id);
+        id
+    }
+
+    fn get_proposal(env: &Env, proposal_id: u64) -> AdminProposal {
+        env.storage()
+            .instance()
+            .get(&("proposal", proposal_id))
+            .expect("Proposal not found")
+    }
+
+    fn save_proposal(env: &Env, proposal: &AdminProposal) {
+        env.storage()
+            .instance()
+            .set(&("proposal", proposal.id), proposal);
+    }
+
+    /// Propose a new admin action. The proposer's approval is counted automatically.
+    pub fn propose_admin_action(env: Env, proposer: Address, action: AdminAction) -> AdminProposal {
+        Self::require_admin(&env, &proposer);
+        Self::require_not_paused(&env);
+
+        let id = Self::next_proposal_id(&env);
+        let mut approvers = Vec::new(&env);
+        approvers.push_back(proposer.clone());
+
+        let proposal = AdminProposal {
+            id,
+            action,
+            proposer: proposer.clone(),
+            approvers,
+            executed: false,
+            created_at: env.ledger().timestamp(),
+        };
+
+        Self::save_proposal(&env, &proposal);
+        events::emit_proposal_created(&env, id, &proposer);
+        proposal
+    }
+
+    /// Approve an existing proposal. Each admin may approve at most once.
+    pub fn approve_admin_proposal(env: Env, approver: Address, proposal_id: u64) -> AdminProposal {
+        Self::require_admin(&env, &approver);
+        Self::require_not_paused(&env);
+
+        let mut proposal = Self::get_proposal(&env, proposal_id);
+
+        if proposal.executed {
+            panic!("Proposal already executed");
+        }
+        if env.ledger().timestamp() > proposal.created_at + PROPOSAL_TTL_SECS {
+            panic!("Proposal expired");
+        }
+        if proposal.approvers.contains(&approver) {
+            panic!("Already approved");
+        }
+
+        proposal.approvers.push_back(approver.clone());
+        Self::save_proposal(&env, &proposal);
+        events::emit_proposal_approved(&env, proposal_id, &approver);
+        proposal
+    }
+
+    /// Execute a proposal once the approval threshold is met.
+    pub fn execute_admin_proposal(env: Env, executor: Address, proposal_id: u64) -> AdminProposal {
+        Self::require_admin(&env, &executor);
+        Self::require_not_paused(&env);
+
+        let mut proposal = Self::get_proposal(&env, proposal_id);
+
+        if proposal.executed {
+            panic!("Proposal already executed");
+        }
+        if env.ledger().timestamp() > proposal.created_at + PROPOSAL_TTL_SECS {
+            panic!("Proposal expired");
+        }
+
+        let threshold = Self::get_multisig_threshold(env.clone());
+        if proposal.approvers.len() < threshold {
+            panic!("Insufficient approvals");
+        }
+
+        match proposal.action.clone() {
+            AdminAction::TransferAdmin(new_admins) => {
+                if new_admins.is_empty() {
+                    panic!("Admin list cannot be empty");
+                }
+                env.storage().instance().set(&ADMINS, &new_admins);
+            }
+            AdminAction::SetPercentages(collector_pct, owner_pct) => {
+                if collector_pct + owner_pct > 100 {
+                    panic!("Total percentages cannot exceed 100");
+                }
+                env.storage().instance().set(
+                    &REWARD_CFG,
+                    &RewardConfig {
+                        collector_percentage: collector_pct,
+                        owner_percentage: owner_pct,
+                    },
+                );
+            }
+            AdminAction::DeactivateWaste(waste_id) => {
+                let mut waste: types::Waste = env
+                    .storage()
+                    .instance()
+                    .get(&("waste_v2", waste_id))
+                    .expect("Waste item not found");
+                if !waste.is_active {
+                    panic!("Waste already deactivated");
+                }
+                waste.deactivate();
+                env.storage()
+                    .instance()
+                    .set(&("waste_v2", waste_id), &waste);
+            }
+        }
+
+        proposal.executed = true;
+        Self::save_proposal(&env, &proposal);
+        events::emit_proposal_executed(&env, proposal_id, &executor);
+        proposal
+    }
+
+    /// Get a proposal by ID.
+    pub fn get_admin_proposal(env: Env, proposal_id: u64) -> AdminProposal {
+        Self::get_proposal(&env, proposal_id)
     }
 
     // ========== Global Metrics ==========
@@ -3155,16 +3557,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
             .instance()
             .get(&symbol_short!("MAT_CNT"))
             .unwrap_or(0);
-        let total_tokens_earned: u128 = env
-            .storage()
-            .instance()
-            .get(&TOTAL_TOKENS)
-            .unwrap_or(0);
-        let total_carbon_credits: u128 = env
-            .storage()
-            .instance()
-            .get(&TOTAL_CARBON)
-            .unwrap_or(0);
+        let total_tokens_earned: u128 = env.storage().instance().get(&TOTAL_TOKENS).unwrap_or(0);
         types::GlobalMetrics {
             total_wastes_count,
             total_tokens_earned,
@@ -3177,7 +3570,13 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// Pause the contract (admin only) — blocks all state-changing functions
     pub fn pause(env: Env, admin: Address) {
         Self::require_admin(&env, &admin);
-        assert!(!env.storage().instance().get::<_, bool>(&PAUSED).unwrap_or(false), "Contract is already paused");
+        assert!(
+            !env.storage()
+                .instance()
+                .get::<_, bool>(&PAUSED)
+                .unwrap_or(false),
+            "Contract is already paused"
+        );
         env.storage().instance().set(&PAUSED, &true);
         events::emit_contract_paused(&env, &admin);
     }
@@ -3185,18 +3584,33 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// Unpause the contract (admin only)
     pub fn unpause(env: Env, admin: Address) {
         Self::require_admin(&env, &admin);
-        assert!(env.storage().instance().get::<_, bool>(&PAUSED).unwrap_or(false), "Contract is not paused");
+        assert!(
+            env.storage()
+                .instance()
+                .get::<_, bool>(&PAUSED)
+                .unwrap_or(false),
+            "Contract is not paused"
+        );
         env.storage().instance().set(&PAUSED, &false);
         events::emit_contract_unpaused(&env, &admin);
     }
 
     /// Get current pause state
     pub fn is_paused(env: Env) -> bool {
-        env.storage().instance().get::<_, bool>(&PAUSED).unwrap_or(false)
+        env.storage()
+            .instance()
+            .get::<_, bool>(&PAUSED)
+            .unwrap_or(false)
     }
 
     fn require_not_paused(env: &Env) {
-        assert!(!env.storage().instance().get::<_, bool>(&PAUSED).unwrap_or(false), "Contract is paused");
+        assert!(
+            !env.storage()
+                .instance()
+                .get::<_, bool>(&PAUSED)
+                .unwrap_or(false),
+            "Contract is paused"
+        );
     }
 
     // ========== Incentive-Based Reward Distribution ==========
@@ -3218,8 +3632,14 @@ impl omni-stellar-omni-stellar-scavengerContract {
         Self::require_not_paused(&env);
         let mut incentive =
             Self::get_incentive_internal(&env, incentive_id).expect("Incentive not found");
-        assert!(incentive.rewarder == manufacturer, "Only incentive creator can distribute rewards");
-        assert!(incentive.waste_type == material.waste_type, "Waste type mismatch");
+        assert!(
+            incentive.rewarder == manufacturer,
+            "Only incentive creator can distribute rewards"
+        );
+        assert!(
+            incentive.waste_type == material.waste_type,
+            "Waste type mismatch"
+        );
         assert!(incentive.active, "Incentive not active");
 
         let weight_kg = material.weight / 1000;
@@ -3268,7 +3688,12 @@ impl omni-stellar-omni-stellar-scavengerContract {
                 if p.role.can_collect_materials() && !p.role.can_manufacture() {
                     token_client.transfer(&manufacturer, &transfer.to, &collector_share);
                     Self::update_participant_stats(&env, &transfer.to, 0, collector_share as u64);
-                    events::emit_tokens_rewarded(&env, &transfer.to, collector_share as u128, waste_id);
+                    events::emit_tokens_rewarded(
+                        &env,
+                        &transfer.to,
+                        collector_share as u128,
+                        waste_id,
+                    );
                     total_distributed += collector_share;
                 }
             }
@@ -3283,10 +3708,17 @@ impl omni-stellar-omni-stellar-scavengerContract {
         if recycler_amount > 0 {
             token_client.transfer(&manufacturer, &material.submitter, &recycler_amount);
             Self::update_participant_stats(&env, &material.submitter, 0, recycler_amount as u64);
-            events::emit_tokens_rewarded(&env, &material.submitter, recycler_amount as u128, waste_id);
+            events::emit_tokens_rewarded(
+                &env,
+                &material.submitter,
+                recycler_amount as u128,
+                waste_id,
+            );
         }
 
-        incentive.remaining_budget = incentive.remaining_budget.saturating_sub(total_reward as u64);
+        incentive.remaining_budget = incentive
+            .remaining_budget
+            .saturating_sub(total_reward as u64);
         if incentive.remaining_budget == 0 {
             incentive.active = false;
         }

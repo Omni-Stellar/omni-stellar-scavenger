@@ -1,4 +1,3 @@
-
 use soroban_sdk::{contracttype, Address, String, Symbol};
 
 /// Represents a transfer record in the recycling system
@@ -60,7 +59,7 @@ pub enum TransferStatus {
 impl TransferItemType {
     /// Validates if the value is a valid TransferItemType variant
     pub fn is_valid(value: u32) -> bool {
-        matches!(value, 0 | 1 | 2 | 3)
+        matches!(value, 0..=3)
     }
 
     /// Converts a u32 to a TransferItemType
@@ -93,7 +92,7 @@ impl TransferItemType {
 impl TransferStatus {
     /// Validates if the value is a valid TransferStatus variant
     pub fn is_valid(value: u32) -> bool {
-        matches!(value, 0 | 1 | 2 | 3 | 4)
+        matches!(value, 0..=4)
     }
 
     /// Converts a u32 to a TransferStatus
@@ -138,8 +137,10 @@ impl TransferStatus {
     }
 }
 
+#[allow(dead_code)]
 impl TransferRecord {
     /// Creates a new TransferRecord with Pending status
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: u64,
         from: Address,
@@ -604,16 +605,19 @@ pub struct Waste {
     pub is_confirmed: bool,
     /// Address of the confirmer/verifier
     pub confirmer: Address,
-    /// Address that has reserved this waste item (None if unreserved)
-    pub reserved_by: Option<Address>,
-    /// Ledger timestamp at which the reservation expires (None if unreserved)
-    pub reserved_until: Option<u64>,
-    /// Expiration timestamp (0 = no expiry). Set from per-type TTL at registration time.
-    pub expires_at: u64,
+    /// Quality grade assigned by a collector or manufacturer
+    pub grade: WasteGrade,
+    /// Category tags for filtering (max 10, each max 20 chars, lowercase)
+    pub tags: soroban_sdk::Vec<soroban_sdk::String>,
+    /// Optional IPFS CID for the primary image (starts with "Qm" or "bafy")
+    pub image_hash: Option<soroban_sdk::String>,
+    /// Supporting document hashes (max 5, each a valid IPFS CID)
+    pub document_hashes: soroban_sdk::Vec<soroban_sdk::String>,
 }
 
 impl Waste {
     /// Creates a new Waste instance with all fields
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         env: &soroban_sdk::Env,
         waste_id: u128,
@@ -646,9 +650,10 @@ impl Waste {
             is_active,
             is_confirmed,
             confirmer,
-            reserved_by: None,
-            reserved_until: None,
-            expires_at,
+            grade: WasteGrade::C,
+            tags: soroban_sdk::Vec::new(env),
+            image_hash: None,
+            document_hashes: soroban_sdk::Vec::new(env),
         }
     }
 
@@ -661,8 +666,8 @@ impl Waste {
     pub fn has_valid_coordinates(&self) -> bool {
         let max_lat = 90_000_000i128;
         let max_lon = 180_000_000i128;
-        
-        self.latitude >= -max_lat 
+
+        self.latitude >= -max_lat
             && self.latitude <= max_lat
             && self.longitude >= -max_lon
             && self.longitude <= max_lon
@@ -749,6 +754,7 @@ impl WasteTransfer {
 
 /// Builder pattern for constructing Waste instances
 /// Provides a fluent API for creating waste with optional fields
+#[allow(dead_code)]
 pub struct WasteBuilder {
     waste_id: u128,
     waste_type: WasteType,
@@ -760,9 +766,10 @@ pub struct WasteBuilder {
     is_active: bool,
     is_confirmed: bool,
     confirmer: Option<Address>,
-    expires_at: u64,
+    grade: WasteGrade,
 }
 
+#[allow(dead_code)]
 impl WasteBuilder {
     /// Creates a new WasteBuilder with required fields
     pub fn new(
@@ -782,7 +789,7 @@ impl WasteBuilder {
             is_active: true,
             is_confirmed: false,
             confirmer: Some(current_owner),
-            expires_at: 0,
+            grade: WasteGrade::C,
         }
     }
 
@@ -818,6 +825,12 @@ impl WasteBuilder {
         self
     }
 
+    /// Sets the waste grade
+    pub fn grade(mut self, grade: WasteGrade) -> Self {
+        self.grade = grade;
+        self
+    }
+
     /// Builds the Waste instance
     pub fn build(self, env: &soroban_sdk::Env) -> Waste {
         let confirmer = self.confirmer.unwrap_or_else(|| self.current_owner.clone());
@@ -839,13 +852,13 @@ impl WasteBuilder {
             is_active: self.is_active,
             is_confirmed: self.is_confirmed,
             confirmer,
-            reserved_by: None,
-            reserved_until: None,
-            expires_at: self.expires_at,
+            grade: self.grade,
+            tags: soroban_sdk::Vec::new(env),
+            image_hash: None,
+            document_hashes: soroban_sdk::Vec::new(env),
         }
     }
 }
-
 
 /// Tracks recycling statistics for a participant
 #[contracttype]
@@ -869,8 +882,11 @@ pub struct RecyclingStats {
     pub plastic_count: u64,
     pub metal_count: u64,
     pub glass_count: u64,
-    pub organic_count: u64,
-    pub electronic_count: u64,
+    /// Number of wastes graded by this participant per grade
+    pub grade_a_count: u64,
+    pub grade_b_count: u64,
+    pub grade_c_count: u64,
+    pub grade_d_count: u64,
 }
 
 impl RecyclingStats {
@@ -888,8 +904,20 @@ impl RecyclingStats {
             plastic_count: 0,
             metal_count: 0,
             glass_count: 0,
-            organic_count: 0,
-            electronic_count: 0,
+            grade_a_count: 0,
+            grade_b_count: 0,
+            grade_c_count: 0,
+            grade_d_count: 0,
+        }
+    }
+
+    /// Records a grading action by this participant
+    pub fn record_grade(&mut self, grade: WasteGrade) {
+        match grade {
+            WasteGrade::A => self.grade_a_count += 1,
+            WasteGrade::B => self.grade_b_count += 1,
+            WasteGrade::C => self.grade_c_count += 1,
+            WasteGrade::D => self.grade_d_count += 1,
         }
     }
 
@@ -1088,7 +1116,7 @@ mod recycling_stats_tests {
     #[test]
     fn test_stats_storage() {
         let env = soroban_sdk::Env::default();
-        let contract_id = env.register_contract(None, crate::omni-stellar-omni-stellar-scavengerContract);
+        let _contract_id = env.register_contract(None, crate::omni-stellar-omni-stellar-scavengerContract);
         let participant = Address::generate(&env);
 
         let stats = RecyclingStats::new(participant.clone());
@@ -1236,7 +1264,7 @@ mod material_tests {
     #[test]
     fn test_material_storage_compatibility() {
         let env = soroban_sdk::Env::default();
-        let contract_id = env.register_contract(None, crate::omni-stellar-omni-stellar-scavengerContract);
+        let _contract_id = env.register_contract(None, crate::omni-stellar-omni-stellar-scavengerContract);
         let submitter = Address::generate(&env);
         let description = String::from_str(&env, "Storage test");
 
@@ -1480,6 +1508,56 @@ mod tests {
     }
 }
 
+/// Quality grade for a waste item
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WasteGrade {
+    /// Grade A — excellent quality, 1.5x reward multiplier (scaled: 150)
+    A = 0,
+    /// Grade B — good quality, 1.2x reward multiplier (scaled: 120)
+    B = 1,
+    /// Grade C — average quality, 1.0x reward multiplier (scaled: 100)
+    C = 2,
+    /// Grade D — poor quality, 0.7x reward multiplier (scaled: 70)
+    D = 3,
+}
+
+impl WasteGrade {
+    /// Returns the reward multiplier scaled by 100 (e.g. 150 = 1.5x).
+    pub fn multiplier_pct(&self) -> u64 {
+        match self {
+            WasteGrade::A => 150,
+            WasteGrade::B => 120,
+            WasteGrade::C => 100,
+            WasteGrade::D => 70,
+        }
+    }
+
+    pub fn from_u32(v: u32) -> Option<Self> {
+        match v {
+            0 => Some(WasteGrade::A),
+            1 => Some(WasteGrade::B),
+            2 => Some(WasteGrade::C),
+            3 => Some(WasteGrade::D),
+            _ => None,
+        }
+    }
+
+    pub fn is_valid(v: u32) -> bool {
+        v <= 3
+    }
+}
+
+/// Immutable audit record for a single grading event
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GradeRecord {
+    pub waste_id: u128,
+    pub grade: WasteGrade,
+    pub grader: Address,
+    pub graded_at: u64,
+}
+
 /// Global contract metrics
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1547,4 +1625,3 @@ pub struct Dispute {
     /// Ledger timestamp when dispute was created
     pub created_at: u64,
 }
-
