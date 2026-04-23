@@ -192,4 +192,7 @@ pub enum Error {
 
     /// (38) Not all wastes share the same location.
     LocationMismatch = 38,
+    /// (32) The waste item has expired (TTL elapsed).
+    /// Returned by: `transfer_waste_v2`, `batch_transfer_waste`
+    WasteExpired = 32,
 }
