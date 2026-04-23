@@ -192,6 +192,18 @@ pub enum Error {
 
     /// (38) Not all wastes share the same location.
     LocationMismatch = 38,
+
+    /// (39) Waste is already reserved by another participant.
+    WasteAlreadyReserved = 39,
+
+    /// (40) Waste is not reserved (cannot cancel a non-existent reservation).
+    WasteNotReserved = 40,
+
+    /// (41) Caller is not the reserver and not the owner; cannot cancel.
+    NotReserver = 41,
+
+    /// (42) Waste is reserved by someone else; transfer is blocked.
+    WasteReservedByOther = 42,
     /// (32) The waste item has expired (TTL elapsed).
     /// Returned by: `transfer_waste_v2`, `batch_transfer_waste`
     WasteExpired = 32,

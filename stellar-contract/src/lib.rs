@@ -1764,6 +1764,14 @@ impl omni-stellar-omni-stellar-scavengerContract {
             return Err(Error::InvalidTransferRoute);
         }
 
+        // Reservation check: block transfer if waste is reserved by someone other than `to`
+        let now = env.ledger().timestamp();
+        if let (Some(reserver), Some(until)) = (waste.reserved_by.clone(), waste.reserved_until) {
+            if until > now && reserver != to {
+                return Err(Error::WasteReservedByOther);
+            }
+        }
+
         waste.transfer_to(to.clone());
         env.storage()
             .instance()
@@ -3232,5 +3240,110 @@ impl omni-stellar-omni-stellar-scavengerContract {
         events::emit_wastes_merged(&env, merged_id, &owner, &waste_ids);
 
         Ok(merged_id)
+    }
+
+    /// Reserve a v2 waste item for a limited time.
+    ///
+    /// Only registered participants may reserve. The waste must be active and
+    /// not already reserved (or the previous reservation must have expired).
+    /// Emits a `WasteReserved` event.
+    ///
+    /// # Parameters
+    /// - `waste_id`: ID of the v2 waste to reserve.
+    /// - `reserver`: Registered participant making the reservation. Must sign.
+    /// - `duration`: Reservation duration in seconds.
+    ///
+    /// # Errors
+    /// - [`Error::WasteNotFound`] if the waste does not exist.
+    /// - [`Error::WasteDeactivated`] if the waste is inactive.
+    /// - [`Error::WasteAlreadyReserved`] if an active reservation exists.
+    pub fn reserve_waste(
+        env: Env,
+        waste_id: u128,
+        reserver: Address,
+        duration: u64,
+    ) -> Result<types::Waste, Error> {
+        reserver.require_auth();
+        Self::require_not_paused(&env);
+        Self::require_registered(&env, &reserver);
+
+        let mut waste: types::Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", waste_id))
+            .ok_or(Error::WasteNotFound)?;
+
+        if !waste.is_active {
+            return Err(Error::WasteDeactivated);
+        }
+
+        let now = env.ledger().timestamp();
+
+        // Block if an active (non-expired) reservation exists
+        if let (Some(_), Some(until)) = (waste.reserved_by.clone(), waste.reserved_until) {
+            if until > now {
+                return Err(Error::WasteAlreadyReserved);
+            }
+        }
+
+        let reserved_until = now.checked_add(duration).ok_or(Error::Overflow)?;
+        waste.reserved_by = Some(reserver.clone());
+        waste.reserved_until = Some(reserved_until);
+
+        env.storage()
+            .instance()
+            .set(&("waste_v2", waste_id), &waste);
+
+        events::emit_waste_reserved(&env, waste_id, &reserver, reserved_until);
+
+        Ok(waste)
+    }
+
+    /// Cancel a reservation on a v2 waste item.
+    ///
+    /// The reserver themselves or the waste owner may cancel. Emits a
+    /// `ReservationCancelled` event.
+    ///
+    /// # Parameters
+    /// - `waste_id`: ID of the v2 waste.
+    /// - `caller`: Reserver or current owner. Must sign.
+    ///
+    /// # Errors
+    /// - [`Error::WasteNotFound`] if the waste does not exist.
+    /// - [`Error::WasteNotReserved`] if no reservation exists.
+    /// - [`Error::NotReserver`] if caller is neither the reserver nor the owner.
+    pub fn cancel_reservation(
+        env: Env,
+        waste_id: u128,
+        caller: Address,
+    ) -> Result<types::Waste, Error> {
+        caller.require_auth();
+        Self::require_not_paused(&env);
+
+        let mut waste: types::Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", waste_id))
+            .ok_or(Error::WasteNotFound)?;
+
+        if waste.reserved_by.is_none() {
+            return Err(Error::WasteNotReserved);
+        }
+
+        let reserver = waste.reserved_by.clone().unwrap();
+        if caller != reserver && caller != waste.current_owner {
+            return Err(Error::NotReserver);
+        }
+
+        waste.reserved_by = None;
+        waste.reserved_until = None;
+
+        env.storage()
+            .instance()
+            .set(&("waste_v2", waste_id), &waste);
+
+        events::emit_reservation_cancelled(&env, waste_id, &caller);
+
+        Ok(waste)
     }
 }

@@ -507,6 +507,10 @@ pub struct Waste {
     pub is_confirmed: bool,
     /// Address of the confirmer/verifier
     pub confirmer: Address,
+    /// Address that has reserved this waste item (None if unreserved)
+    pub reserved_by: Option<Address>,
+    /// Ledger timestamp at which the reservation expires (None if unreserved)
+    pub reserved_until: Option<u64>,
     /// Expiration timestamp (0 = no expiry). Set from per-type TTL at registration time.
     pub expires_at: u64,
 }
@@ -537,6 +541,8 @@ impl Waste {
             is_active,
             is_confirmed,
             confirmer,
+            reserved_by: None,
+            reserved_until: None,
             expires_at,
         }
     }
@@ -721,6 +727,8 @@ impl WasteBuilder {
             is_active: self.is_active,
             is_confirmed: self.is_confirmed,
             confirmer,
+            reserved_by: None,
+            reserved_until: None,
             expires_at: self.expires_at,
         }
     }

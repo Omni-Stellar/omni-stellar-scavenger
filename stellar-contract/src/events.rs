@@ -130,6 +130,22 @@ pub fn emit_contract_unpaused(env: &Env, admin: &Address) {
     env.events().publish((symbol_short!("unpaused"),), admin);
 }
 
+/// Emit event when a waste item is reserved
+pub fn emit_waste_reserved(env: &Env, waste_id: u128, reserved_by: &Address, reserved_until: u64) {
+    env.events().publish(
+        (symbol_short!("wst_res"), waste_id),
+        (reserved_by, reserved_until),
+    );
+}
+
+/// Emit event when a reservation is cancelled
+pub fn emit_reservation_cancelled(env: &Env, waste_id: u128, cancelled_by: &Address) {
+    env.events().publish(
+        (symbol_short!("res_cncl"), waste_id),
+        cancelled_by,
+    );
+}
+
 /// Emit event when multiple waste items are merged into one
 pub fn emit_wastes_merged(
     env: &Env,
