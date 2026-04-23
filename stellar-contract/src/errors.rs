@@ -180,4 +180,7 @@ pub enum Error {
 
     /// (34) At least two split weights are required.
     TooFewSplits = 34,
+    /// (32) The waste item has expired (TTL elapsed).
+    /// Returned by: `transfer_waste_v2`, `batch_transfer_waste`
+    WasteExpired = 32,
 }
