@@ -1,0 +1,58 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: omni-stellar-scavenger-ingress
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - omni-stellar-scavenger.app
+    - api.omni-stellar-scavenger.app
+    secretName: omni-stellar-scavenger-tls
+  rules:
+  - host: omni-stellar-scavenger.app
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: omni-stellar-scavenger-frontend
+            port:
+              number: 80
+  - host: api.omni-stellar-scavenger.app
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: omni-stellar-scavenger-contract
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: omni-stellar-scavenger-config
+  namespace: default
+data:
+  stellar_network: "testnet"
+  log_level: "info"
+  metrics_enabled: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: omni-stellar-scavenger-secrets
+  namespace: default
+type: Opaque
+stringData:
+  contract_id: "CHANGE_ME"
+  admin_key: "CHANGE_ME"
+  token_address: "CHANGE_ME"
