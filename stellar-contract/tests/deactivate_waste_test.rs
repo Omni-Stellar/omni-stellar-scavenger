@@ -4,7 +4,7 @@ use stellar_scavngr_contract::{
     ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType,
 };
 
-fn create_test_contract(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient, Address) {
+fn create_test_contract(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient<'_>, Address) {
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);
     let client = omni-stellar-omni-stellar-scavengerContractClient::new(env, &contract_id);
 
@@ -45,7 +45,7 @@ fn test_deactivate_waste() {
     let deactivated = client.deactivate_waste(&waste_id, &admin);
 
     // Verify waste is deactivated
-    assert_eq!(deactivated.is_active, false);
+    assert!(!deactivated.is_active);
     assert_eq!(deactivated.waste_id, waste_id);
 }
 
@@ -156,7 +156,7 @@ fn test_deactivated_waste_not_counted_in_totals() {
         &-93_000_000,
     );
 
-    let waste2 = client.recycle_waste(&WasteType::Metal, &2000, &owner, &45_000_000, &-93_000_000);
+    let _waste2 = client.recycle_waste(&WasteType::Metal, &2000, &owner, &45_000_000, &-93_000_000);
 
     // Get initial stats
     let initial_stats = client.get_supply_chain_stats();
