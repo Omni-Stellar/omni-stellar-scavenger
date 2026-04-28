@@ -18,7 +18,11 @@
     "smoke": "SMOKE=1 playwright test --project=smoke",
     "smoke:ci": "SMOKE=1 playwright test --project=smoke --reporter=list,html",
     "a11y": "playwright test --grep 'Accessibility|Keyboard Navigation'",
-    "a11y:ui": "playwright test --grep 'Accessibility|Keyboard Navigation' --ui"
+    "a11y:ui": "playwright test --grep 'Accessibility|Keyboard Navigation' --ui",
+    "visual": "playwright test --project=visual-chromium --project=visual-firefox --project=visual-mobile",
+    "visual:update": "playwright test --project=visual-chromium --project=visual-firefox --project=visual-mobile --update-snapshots",
+    "visual:chromium": "playwright test --project=visual-chromium",
+    "visual:report": "playwright show-report playwright-report"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

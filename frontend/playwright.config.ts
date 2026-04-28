@@ -12,39 +12,74 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: isSmoke
-    ? [['list'], ['html', { open: 'never' }]]
-    : 'html',
+  reporter: [
+    ['html', { outputFolder: 'playwright-report' }],
+    ['json', { outputFile: 'playwright-report/results.json' }],
+  ],
   use: {
     baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  projects: [
-    // ── Smoke project (post-deployment, no dev server) ──────────────────────
-    {
-      name: 'smoke',
-      testMatch: '**/smoke.spec.ts',
-      use: { ...devices['Desktop Chrome'] },
+
+  // Snapshot comparison settings
+  expect: {
+    toHaveScreenshot: {
+      // Allow up to 0.2% pixel difference to handle anti-aliasing across OS/GPU
+      maxDiffPixelRatio: 0.002,
+      // Snapshots stored per-project so chrome/firefox baselines are separate
+      animations: 'disabled',
     },
-    // ── Full e2e projects (local dev server) ────────────────────────────────
+  },
+
+  projects: [
+    // ── Standard E2E (non-visual) ──────────────────────────────────────────
     {
       name: 'chromium',
-      testIgnore: '**/smoke.spec.ts',
+      testIgnore: '**/visual-regression.spec.ts',
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'firefox',
-      testIgnore: '**/smoke.spec.ts',
+      testIgnore: '**/visual-regression.spec.ts',
       use: { ...devices['Desktop Firefox'] },
     },
-  ],
-  // Dev server only for non-smoke runs
-  webServer: isSmoke
-    ? undefined
-    : {
-        command: 'npm run dev',
-        url: 'http://localhost:5173',
-        reuseExistingServer: !process.env.CI,
+
+    // ── Visual Regression ─────────────────────────────────────────────────
+    {
+      name: 'visual-chromium',
+      testMatch: '**/visual-regression.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
       },
+      snapshotPathTemplate:
+        '{testDir}/__snapshots__/{projectName}/{testFilePath}/{arg}{ext}',
+    },
+    {
+      name: 'visual-firefox',
+      testMatch: '**/visual-regression.spec.ts',
+      use: {
+        ...devices['Desktop Firefox'],
+        viewport: { width: 1280, height: 800 },
+      },
+      snapshotPathTemplate:
+        '{testDir}/__snapshots__/{projectName}/{testFilePath}/{arg}{ext}',
+    },
+    {
+      name: 'visual-mobile',
+      testMatch: '**/visual-regression.spec.ts',
+      use: {
+        ...devices['Pixel 5'],
+      },
+      snapshotPathTemplate:
+        '{testDir}/__snapshots__/{projectName}/{testFilePath}/{arg}{ext}',
+    },
+  ],
+
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:5173',
+    reuseExistingServer: !process.env.CI,
+  },
 });
