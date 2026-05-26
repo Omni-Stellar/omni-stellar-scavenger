@@ -2,6 +2,8 @@
 
 mod errors;
 mod events;
+mod test_expiration;
+mod test_grading;
 mod test_transfer_path_validation;
 mod types;
 mod validation;
