@@ -1827,6 +1827,46 @@ mod tests {
     }
 }
 
+// ─── Grading rules per waste type ───────────────────────────────────────────
+// These methods are defined after WasteGrade to allow forward-reference use.
+
+impl WasteType {
+    /// Returns the minimum acceptable quality grade for this waste type.
+    ///
+    /// Grading rules are based on material complexity, safety requirements,
+    /// and downstream processing needs:
+    ///
+    /// | Waste Type  | Min Grade | Rationale |
+    /// |-------------|-----------|-----------|
+    /// | Electronic  | B         | Safety and data-destruction compliance |
+    /// | Metal       | C         | Contamination tolerance moderate |
+    /// | Glass       | C         | Breakage and contaminant-free needed |
+    /// | PetPlastic  | C         | Food-contact reuse standards |
+    /// | Paper       | D         | Broad recyclability, lower quality OK |
+    /// | Plastic     | D         | General plastic stream tolerance |
+    /// | Organic     | D         | Composting accepts poor-condition material |
+    pub fn min_acceptable_grade(&self) -> WasteGrade {
+        match self {
+            WasteType::Electronic => WasteGrade::B,
+            WasteType::Metal => WasteGrade::C,
+            WasteType::Glass => WasteGrade::C,
+            WasteType::PetPlastic => WasteGrade::C,
+            WasteType::Paper => WasteGrade::D,
+            WasteType::Plastic => WasteGrade::D,
+            WasteType::Organic => WasteGrade::D,
+        }
+    }
+
+    /// Checks whether the given grade meets this waste type's minimum quality bar.
+    ///
+    /// Returns `true` if `grade` is at least as good as the minimum acceptable
+    /// grade (i.e. the numeric discriminant of `grade` is ≤ that of the minimum,
+    /// since A=0 is the best and D=3 is the worst).
+    pub fn grade_is_acceptable(&self, grade: WasteGrade) -> bool {
+        (grade as u32) <= (self.min_acceptable_grade() as u32)
+    }
+}
+
 /// Quality grade for a waste item
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
