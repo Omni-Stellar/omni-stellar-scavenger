@@ -35,6 +35,7 @@ const PART_INDEX: Symbol = symbol_short!("PART_IDX");
 const PAUSED: Symbol = symbol_short!("PAUSED");
 const MULTISIG_THRESHOLD: Symbol = symbol_short!("MS_THRESH");
 const PROPOSAL_COUNT: Symbol = symbol_short!("PROP_CNT");
+const MIN_WEIGHT: Symbol = symbol_short!("MIN_WGT");
 
 // New feature storage keys
 const CHALLENGE_COUNT: Symbol = symbol_short!("CHAL_CNT");
@@ -209,16 +210,21 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics `"Admin already initialized"` if called more than once.
     pub fn initialize_admin(env: Env, admin: Address) {
+        // Reentrancy guard
+        Self::lock(&env);
         admin.require_auth();
 
         // Check if admin is already set
         if env.storage().instance().has(&ADMINS) {
+            Self::unlock(&env);
             panic!("Admin already initialized");
         }
 
         let mut admins = Vec::new(&env);
         admins.push_back(admin);
         env.storage().instance().set(&ADMINS, &admins);
+
+        Self::unlock(&env);
     }
 
     /// Get the current admin addresses.
@@ -252,17 +258,23 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// Transfer admin rights to new addresses (current admin only)
     /// Replaces the entire admin list with the new list.
     pub fn transfer_admin(env: Env, current_admin: Address, new_admins: Vec<Address>) {
+        // Reentrancy guard
+        Self::lock(&env);
         Self::require_admin(&env, &current_admin);
         // Validate new_admins is not empty
         if new_admins.is_empty() {
+            Self::unlock(&env);
             panic!("Admin list cannot be empty");
         }
         env.storage().instance().set(&ADMINS, &new_admins);
         events::emit_admin_transferred(&env, &current_admin);
+        Self::unlock(&env);
     }
 
     /// Add a new admin address (current admin only)
     pub fn add_admin(env: Env, current_admin: Address, new_admin: Address) {
+        // Reentrancy guard
+        Self::lock(&env);
         Self::require_admin(&env, &current_admin);
         let mut admins: Vec<Address> = env
             .storage()
@@ -273,11 +285,14 @@ impl omni-stellar-omni-stellar-scavengerContract {
             admins.push_back(new_admin);
             env.storage().instance().set(&ADMINS, &admins);
         }
+        Self::unlock(&env);
     }
 
     /// Remove an admin address (current admin only)
     /// Cannot remove the last admin.
     pub fn remove_admin(env: Env, current_admin: Address, admin_to_remove: Address) {
+        // Reentrancy guard
+        Self::lock(&env);
         Self::require_admin(&env, &current_admin);
         let admins: Vec<Address> = env
             .storage()
@@ -285,6 +300,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
             .get(&ADMINS)
             .expect("Admin not set");
         if admins.len() <= 1 {
+            Self::unlock(&env);
             panic!("Cannot remove the last admin");
         }
         // Find and remove the admin
@@ -295,9 +311,11 @@ impl omni-stellar-omni-stellar-scavengerContract {
             }
         }
         if new_admins.len() == admins.len() {
+            Self::unlock(&env);
             panic!("Admin to remove not found");
         }
         env.storage().instance().set(&ADMINS, &new_admins);
+        Self::unlock(&env);
     }
 
     /// Check if caller is admin
@@ -401,11 +419,15 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
     // ========== Reentrancy Guard Helper Functions ==========
 
-    fn require_addresses_different(from: &Address, to: &Address) {
-        if from == to {
-            panic!("Self-transfer is not allowed");
-        }
-    }
+     /// Prevents self-transfer by ensuring the 'from' and 'to' addresses are different.
+     ///
+     /// # Panics
+     /// - Panics with "Self-transfer is not allowed" if `from` equals `to`.
+     fn require_addresses_different(from: &Address, to: &Address) {
+         if from == to {
+             panic!("Self-transfer is not allowed");
+         }
+     }
 
     /// Apply a reputation delta to a participant (clamped to [REP_MIN, REP_MAX]).
     /// Also updates `last_active_at` so decay timers reset on activity.
@@ -541,9 +563,12 @@ impl omni-stellar-omni-stellar-scavengerContract {
         collector_percentage: u32,
         owner_percentage: u32,
     ) {
+        // Reentrancy guard
+        Self::lock(&env);
         Self::only_admin(&env, &admin);
 
         if collector_percentage + owner_percentage > 100 {
+            Self::unlock(&env);
             panic!("Total percentages cannot exceed 100");
         }
 
@@ -554,6 +579,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
                 owner_percentage,
             },
         );
+        Self::unlock(&env);
     }
 
     /// Get the current collector reward percentage.
@@ -579,14 +605,18 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics `"Total percentages cannot exceed 100"` if `new_percentage + owner_pct > 100`.
     pub fn set_collector_percentage(env: Env, admin: Address, new_percentage: u32) {
+        // Reentrancy guard
+        Self::lock(&env);
         Self::only_admin(&env, &admin);
 
         let mut cfg = Self::get_reward_config(&env);
         if new_percentage + cfg.owner_percentage > 100 {
+            Self::unlock(&env);
             panic!("Total percentages cannot exceed 100");
         }
         cfg.collector_percentage = new_percentage;
         env.storage().instance().set(&REWARD_CFG, &cfg);
+        Self::unlock(&env);
     }
 
     /// Update only the owner percentage, preserving the collector percentage.
@@ -598,17 +628,48 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics `"Total percentages cannot exceed 100"` if `collector_pct + new_percentage > 100`.
     pub fn set_owner_percentage(env: Env, admin: Address, new_percentage: u32) {
+        // Reentrancy guard
+        Self::lock(&env);
         Self::only_admin(&env, &admin);
 
         let mut cfg = Self::get_reward_config(&env);
         if cfg.collector_percentage + new_percentage > 100 {
+            Self::unlock(&env);
             panic!("Total percentages cannot exceed 100");
         }
         cfg.owner_percentage = new_percentage;
         env.storage().instance().set(&REWARD_CFG, &cfg);
+        Self::unlock(&env);
     }
 
-    // ========== Token Management Functions ==========
+     /// Set the minimum weight for waste submissions (in grams).
+     ///
+     /// # Parameters
+     /// - `admin`: Contract admin. Must sign.
+     /// - `min_weight`: Minimum weight in grams (must be <= MAX_WASTE_WEIGHT).
+     ///
+     /// # Errors
+     /// - Panics if `min_weight` is greater than MAX_WASTE_WEIGHT.
+     pub fn set_min_weight(env: Env, admin: Address, min_weight: u128) {
+         Self::only_admin(&env, &admin);
+         if min_weight > MAX_WASTE_WEIGHT {
+             panic!("Minimum weight cannot exceed maximum allowed weight");
+         }
+         env.storage().instance().set(&MIN_WEIGHT, &min_weight);
+     }
+
+     /// Get the configured minimum weight for waste submissions (in grams).
+     ///
+     /// # Returns
+     /// The minimum weight in grams, defaults to 1 if not set.
+     pub fn get_min_weight(env: Env) -> u128 {
+         env.storage()
+             .instance()
+             .get(&MIN_WEIGHT)
+             .unwrap_or(1)
+     }
+
+     // ========== Token Management Functions ==========
 
     /// Set the SEP-41 token contract address used for reward transfers.
     ///
@@ -616,8 +677,11 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// - `admin`: Contract admin. Must sign.
     /// - `token_address`: Address of the token contract.
     pub fn set_token_address(env: Env, admin: Address, token_address: Address) {
+        // Reentrancy guard
+        Self::lock(&env);
         Self::require_admin(&env, &admin);
         env.storage().instance().set(&TOKEN_ADDR, &token_address);
+        Self::unlock(&env);
     }
 
     /// Get the configured token contract address.
@@ -637,12 +701,15 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// - Panics if `multiplier` is 0, < 100, or > 500.
     /// - Panics if `start >= end`.
     pub fn set_seasonal_multiplier(env: Env, admin: Address, multiplier: u32, start: u64, end: u64) {
+        // Reentrancy guard
+        Self::lock(&env);
         Self::require_admin(&env, &admin);
         assert!(multiplier >= 100 && multiplier <= 500, "Multiplier must be between 100 and 500 basis points");
         assert!(start < end, "start must be before end");
         let seasonal = SeasonalMultiplier { multiplier, start, end };
         env.storage().instance().set(&SEASONAL_MUL, &seasonal);
         events::emit_seasonal_multiplier_set(&env, multiplier, start, end);
+        Self::unlock(&env);
     }
 
     /// Return the active seasonal multiplier in basis points, or 100 (1x) if none is active.
@@ -2008,15 +2075,17 @@ impl omni-stellar-omni-stellar-scavengerContract {
     ///
     /// # Parameters
     /// - `waste_type`: Category of the material (e.g. `Plastic`, `Metal`).
-    /// - `weight`: Weight in grams (must be > 0 for meaningful rewards).
+    /// - `weight`: Weight in grams (must be at least the minimum weight configured by admin).
     /// - `submitter`: Registered participant submitting the material. Must sign.
     /// - `description`: Free-text description of the material.
     ///
     /// # Returns
     /// The newly created [`Material`] record with a unique `id`.
     ///
-    /// # Errors
-    /// - Panics `"Caller is not a registered participant"` if `submitter` is not registered.
+     /// # Errors
+     /// - Panics `"Caller is not a registered participant"` if `submitter` is not registered.
+     /// - Panics `"Waste weight below minimum allowed"` if weight is less than the minimum weight.
+     /// - Panics `"Waste weight exceeds maximum allowed"` if weight exceeds MAX_WASTE_WEIGHT.
     pub fn submit_material(
         env: Env,
         waste_type: WasteType,
@@ -2028,10 +2097,10 @@ impl omni-stellar-omni-stellar-scavengerContract {
         Self::require_not_paused(&env);
         Self::only_registered(&env, &submitter);
 
-        if weight == 0 {
-            panic!("Waste weight must be greater than zero");
+        let min_weight = Self::get_min_weight(&env);
+        if weight as u128 < min_weight {
+            panic!("Waste weight below minimum allowed");
         }
-
         if weight as u128 > MAX_WASTE_WEIGHT {
             panic!("Waste weight exceeds maximum allowed");
         }
@@ -2080,7 +2149,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     ///
     /// # Parameters
     /// - `waste_type`: Category of the waste.
-    /// - `weight`: Weight in grams (must be > 0).
+    /// - `weight`: Weight in grams (must be at least the minimum weight configured by admin).
     /// - `recycler`: Registered participant creating the record. Must sign.
     /// - `latitude`: Collection latitude in microdegrees.
     /// - `longitude`: Collection longitude in microdegrees.
@@ -2088,9 +2157,10 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Returns
     /// The new waste ID (`u128`).
     ///
-    /// # Errors
-    /// - Panics `"Waste weight must be greater than zero"`.
-    /// - Panics `"Caller is not a registered participant"`.
+     /// # Errors
+     /// - Panics `"Waste weight below minimum allowed"` if weight is less than the minimum weight.
+     /// - Panics `"Waste weight exceeds maximum allowed"` if weight exceeds MAX_WASTE_WEIGHT.
+     /// - Panics `"Caller is not a registered participant"`.
     pub fn recycle_waste(
         env: Env,
         waste_type: WasteType,
@@ -2103,10 +2173,10 @@ impl omni-stellar-omni-stellar-scavengerContract {
         Self::require_not_paused(&env);
         Self::only_registered(&env, &recycler);
 
-        if weight == 0 {
-            panic!("Waste weight must be greater than zero");
+        let min_weight = Self::get_min_weight(&env);
+        if weight < min_weight {
+            panic!("Waste weight below minimum allowed");
         }
-
         if weight > MAX_WASTE_WEIGHT {
             panic!("Waste weight exceeds maximum allowed");
         }
