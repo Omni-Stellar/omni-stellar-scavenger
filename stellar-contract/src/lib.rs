@@ -8,10 +8,12 @@ mod validation;
 
 pub use errors::Error;
 pub use types::{
-    Challenge, ChallengeProgress, ChallengeStatus, CertificationLevel, GlobalMetrics, GradeRecord, Auction, Incentive,
-    LeaderboardEntry, Material, Milestone, ParticipantRole, PendingTransfer,
-    PendingTransferStatus, ProcessingRecord, ProcessingStatus, RecyclingStats, SeasonalMultiplier,
-    TransferItemType, TransferRecord, TransferStatus, Waste, WasteGrade, WasteTransfer, WasteType,
+    Auction, CarbonListing, CertificationLevel, Challenge, ChallengeProgress, ChallengeStatus,
+    ContaminationReport, GlobalMetrics, GradeRecord, Incentive, LeaderboardEntry, Material,
+    MaterialComposition, Milestone, OptionalWasteType, ParticipantRole, PendingTransfer,
+    PendingTransferStatus, ProcessingRecord, ProcessingStatus, RecyclingGoal, RecyclingStats,
+    SeasonalMultiplier, TransferItemType, TransferRecord, TransferStatus, Waste, WasteGrade,
+    WasteTransfer, WasteType,
 };
 pub use types::calculate_carbon_credits;
 
@@ -42,6 +44,10 @@ const AUCTION_COUNT: Symbol = symbol_short!("AUC_CNT");
 const SEASONAL_MUL: Symbol = symbol_short!("SEAS_MUL");
 const TOTAL_CARBON: Symbol = symbol_short!("TOT_CARB");
 const CONTAMINATED_LIST: Symbol = symbol_short!("CONT_LST");
+
+// Carbon credit marketplace counter and active-listing index
+const CARB_LIST_CNT: Symbol = symbol_short!("CARB_CNT");
+const CARB_LIST_IDX: Symbol = symbol_short!("CARB_IDX");
 
 // Reputation delta constants
 const REP_TRANSFER: i128 = 5;
@@ -1399,8 +1405,8 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics if caller is not admin
     /// - Panics if participant not found
-    pub fn grant_certification(env: Env, address: Address, level: CertificationLevel) {
-        Self::require_admin(&env);
+    pub fn grant_certification(env: Env, admin: Address, address: Address, level: CertificationLevel) {
+        Self::require_admin(&env, &admin);
 
         let key = (address.clone(),);
         if let Some(mut participant) = env.storage().instance().get::<_, Participant>(&key) {
@@ -1424,7 +1430,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     ///
     /// # Returns
     /// Vector of participant addresses with the specified certification level
-    pub fn get_participants_by_certification(env: Env, level: CertificationLevel) -> Vec<Address> {
+    pub fn get_participants_by_cert(env: Env, level: CertificationLevel) -> Vec<Address> {
         let participant_index: Vec<Address> = env
             .storage()
             .instance()
@@ -1457,7 +1463,8 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics if waste not found or not owned by caller
     /// - Panics if duration invalid
-    pub fn create_auction(env: Env, waste_id: u128, start_price: u128, duration: u64) -> u64 {
+    pub fn create_auction(env: Env, creator: Address, waste_id: u128, start_price: u128, duration: u64) -> u64 {
+        creator.require_auth();
         Self::require_not_paused(&env);
 
         // Validate duration
@@ -1465,15 +1472,13 @@ impl omni-stellar-omni-stellar-scavengerContract {
             panic!("Invalid auction duration");
         }
 
-        // Get waste and check ownership
-        let waste = Self::get_waste_by_id(env.clone(), waste_id as u64)
-            .expect("Waste not found");
-        if waste.current_owner != env.invoker() {
+        // Get v2 waste and check ownership
+        let mut waste: types::Waste = env.storage().instance().get(&("waste_v2", waste_id)).expect("Waste not found");
+        if waste.current_owner != creator {
             panic!("Not waste owner");
         }
 
         // Transfer waste to contract for auction
-        let mut waste: types::Waste = env.storage().instance().get(&("waste_v2", waste_id)).expect("Waste not found");
         waste.current_owner = env.current_contract_address();
         env.storage().instance().set(&("waste_v2", waste_id), &waste);
 
@@ -1482,12 +1487,12 @@ impl omni-stellar-omni-stellar-scavengerContract {
         env.storage().instance().set(&AUCTION_COUNT, &auction_id);
 
         // Create auction
-        let auction = Auction::new(&env, auction_id, waste_id, env.invoker(), start_price, duration);
+        let auction = Auction::new(&env, auction_id, waste_id, creator.clone(), start_price, duration);
         let key = ("auction", auction_id);
         env.storage().instance().set(&key, &auction);
 
         // Emit event
-        events::emit_auction_created(&env, auction_id, waste_id, &env.invoker(), start_price, auction.end_time);
+        events::emit_auction_created(&env, auction_id, waste_id, &creator, start_price, auction.end_time);
 
         auction_id
     }
@@ -1501,9 +1506,9 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics if auction not found or ended
     /// - Panics if bid too low
-    pub fn place_bid(env: Env, auction_id: u64, amount: u128) {
+    pub fn place_bid(env: Env, bidder: Address, auction_id: u64, amount: u128) {
+        bidder.require_auth();
         Self::require_not_paused(&env);
-        env.invoker().require_auth();
 
         let key = ("auction", auction_id);
         let mut auction: Auction = env.storage().instance().get(&key).expect("Auction not found");
@@ -1516,14 +1521,11 @@ impl omni-stellar-omni-stellar-scavengerContract {
             panic!("Bid too low");
         }
 
-        // Transfer tokens from bidder to contract (assuming token contract)
-        // For simplicity, assume tokens are handled externally or use internal balance
-
-        auction.place_bid(env.invoker(), amount);
+        auction.place_bid(bidder.clone(), amount);
         env.storage().instance().set(&key, &auction);
 
         // Emit event
-        events::emit_bid_placed(&env, auction_id, &env.invoker(), amount);
+        events::emit_bid_placed(&env, auction_id, &bidder, amount);
     }
 
     /// End an auction and transfer waste to winner
@@ -1564,14 +1566,14 @@ impl omni-stellar-omni-stellar-scavengerContract {
     ///
     /// # Errors
     /// - Panics if not owner or auction has bids
-    pub fn cancel_auction(env: Env, auction_id: u64) {
+    pub fn cancel_auction(env: Env, caller: Address, auction_id: u64) {
+        caller.require_auth();
         Self::require_not_paused(&env);
-        env.invoker().require_auth();
 
         let key = ("auction", auction_id);
         let auction: Auction = env.storage().instance().get(&key).expect("Auction not found");
 
-        if auction.creator != env.invoker() {
+        if auction.creator != caller {
             panic!("Not auction creator");
         }
 
@@ -1621,8 +1623,8 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics if not admin
     /// - Panics if batch too large
-    pub fn bulk_import_wastes(env: Env, wastes: soroban_sdk::Vec<types::Waste>) {
-        Self::require_admin(&env);
+    pub fn bulk_import_wastes(env: Env, admin: Address, wastes: soroban_sdk::Vec<types::Waste>) {
+        Self::require_admin(&env, &admin);
 
         if wastes.len() > 100 {
             panic!("Batch too large");
@@ -1654,8 +1656,8 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// # Errors
     /// - Panics if not admin
     /// - Panics if batch too large
-    pub fn bulk_import_participants(env: Env, participants: soroban_sdk::Vec<Participant>) {
-        Self::require_admin(&env);
+    pub fn bulk_import_participants(env: Env, admin: Address, participants: soroban_sdk::Vec<Participant>) {
+        Self::require_admin(&env, &admin);
 
         if participants.len() > 100 {
             panic!("Batch too large");
@@ -2235,7 +2237,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
                 if goal.achieved {
                     continue;
                 }
-                let type_matches = goal.waste_type.map_or(true, |t| t == waste.waste_type);
+                let type_matches = goal.waste_type.matches(waste.waste_type);
                 if type_matches {
                     goal.current_weight = goal.current_weight.saturating_add(waste.weight);
                     if goal.current_weight >= goal.target_weight {
@@ -3212,6 +3214,300 @@ impl omni-stellar-omni-stellar-scavengerContract {
         stats.map(|s| s.carbon_credits_earned).unwrap_or(0)
     }
 
+    // ========== Carbon Credit Redemption & Marketplace ==========
+
+    /// Redeem (burn) a portion of a participant's earned carbon credits.
+    ///
+    /// Decrements the participant's `RecyclingStats.carbon_credits_earned` by
+    /// `amount` and emits a `carb_rdm` event. Returns the remaining balance.
+    ///
+    /// # Errors
+    /// - `InvalidAmount` if `amount == 0`.
+    /// - `InsufficientCarbonCredits` if the balance is below `amount`.
+    /// - `NotRegistered` if the participant has no recycling stats yet.
+    pub fn redeem_carbon_credits(
+        env: Env,
+        participant: Address,
+        amount: u128,
+    ) -> Result<u128, Error> {
+        Self::require_not_paused(&env);
+        participant.require_auth();
+
+        if amount == 0 {
+            return Err(Error::InvalidAmount);
+        }
+
+        let mut stats: RecyclingStats = env
+            .storage()
+            .instance()
+            .get(&("stats", participant.clone()))
+            .ok_or(Error::NotRegistered)?;
+
+        if stats.carbon_credits_earned < amount {
+            return Err(Error::InsufficientCarbonCredits);
+        }
+
+        stats.carbon_credits_earned -= amount;
+        let remaining = stats.carbon_credits_earned;
+        env.storage()
+            .instance()
+            .set(&("stats", participant.clone()), &stats);
+
+        events::emit_carbon_credits_redeemed(&env, &participant, amount, remaining);
+        Ok(remaining)
+    }
+
+    /// List a quantity of carbon credits for sale on the marketplace.
+    ///
+    /// The credits are escrowed: `amount` is subtracted from the seller's
+    /// `RecyclingStats.carbon_credits_earned` and stored on the listing until
+    /// it is cancelled or purchased.
+    ///
+    /// # Errors
+    /// - `InvalidListing` if `amount == 0` or `price_per_credit <= 0`.
+    /// - `NotRegistered` if the seller has no recycling stats.
+    /// - `InsufficientCarbonCredits` if the seller's balance is below `amount`.
+    pub fn create_carbon_listing(
+        env: Env,
+        seller: Address,
+        amount: u128,
+        price_per_credit: i128,
+    ) -> Result<u64, Error> {
+        Self::require_not_paused(&env);
+        seller.require_auth();
+
+        if amount == 0 || price_per_credit <= 0 {
+            return Err(Error::InvalidListing);
+        }
+
+        let mut stats: RecyclingStats = env
+            .storage()
+            .instance()
+            .get(&("stats", seller.clone()))
+            .ok_or(Error::NotRegistered)?;
+
+        if stats.carbon_credits_earned < amount {
+            return Err(Error::InsufficientCarbonCredits);
+        }
+
+        // Escrow: subtract from seller stats
+        stats.carbon_credits_earned -= amount;
+        env.storage()
+            .instance()
+            .set(&("stats", seller.clone()), &stats);
+
+        // Mint new listing id
+        let id: u64 = env
+            .storage()
+            .instance()
+            .get(&CARB_LIST_CNT)
+            .unwrap_or(0u64)
+            + 1;
+        env.storage().instance().set(&CARB_LIST_CNT, &id);
+
+        let listing = CarbonListing {
+            id,
+            seller: seller.clone(),
+            amount,
+            price_per_credit,
+            is_active: true,
+            created_at: env.ledger().timestamp(),
+        };
+        env.storage()
+            .instance()
+            .set(&("carb_list", id), &listing);
+
+        // Append to active-listing index
+        let mut idx: Vec<u64> = env
+            .storage()
+            .instance()
+            .get(&CARB_LIST_IDX)
+            .unwrap_or(Vec::new(&env));
+        idx.push_back(id);
+        env.storage().instance().set(&CARB_LIST_IDX, &idx);
+
+        events::emit_carbon_listing_created(&env, id, &seller, amount, price_per_credit);
+        Ok(id)
+    }
+
+    /// Cancel an active carbon-credit listing and return the escrowed credits
+    /// to the seller's `RecyclingStats.carbon_credits_earned`.
+    ///
+    /// # Errors
+    /// - `CarbonListingNotFound` if no listing exists for `listing_id`.
+    /// - `CarbonListingInactive` if the listing is already cancelled or purchased.
+    /// - `NotListingSeller` if the caller is not the seller.
+    pub fn cancel_carbon_listing(
+        env: Env,
+        listing_id: u64,
+        seller: Address,
+    ) -> Result<(), Error> {
+        Self::require_not_paused(&env);
+        seller.require_auth();
+
+        let mut listing: CarbonListing = env
+            .storage()
+            .instance()
+            .get(&("carb_list", listing_id))
+            .ok_or(Error::CarbonListingNotFound)?;
+
+        if !listing.is_active {
+            return Err(Error::CarbonListingInactive);
+        }
+        if listing.seller != seller {
+            return Err(Error::NotListingSeller);
+        }
+
+        // Return escrowed credits to seller
+        let mut stats: RecyclingStats = env
+            .storage()
+            .instance()
+            .get(&("stats", seller.clone()))
+            .unwrap_or_else(|| RecyclingStats::new(seller.clone()));
+        stats.carbon_credits_earned = stats
+            .carbon_credits_earned
+            .checked_add(listing.amount)
+            .ok_or(Error::Overflow)?;
+        env.storage()
+            .instance()
+            .set(&("stats", seller.clone()), &stats);
+
+        listing.is_active = false;
+        env.storage()
+            .instance()
+            .set(&("carb_list", listing_id), &listing);
+
+        Self::remove_active_listing(&env, listing_id);
+
+        events::emit_carbon_listing_cancelled(&env, listing_id, &seller);
+        Ok(())
+    }
+
+    /// Purchase an active carbon-credit listing.
+    ///
+    /// Transfers `listing.amount * listing.price_per_credit` tokens from the
+    /// buyer to the seller via the configured token contract, then credits
+    /// the buyer's `RecyclingStats.carbon_credits_earned` with `listing.amount`.
+    ///
+    /// # Errors
+    /// - `CarbonListingNotFound`, `CarbonListingInactive`.
+    /// - `InvalidListing` if the buyer is the seller.
+    /// - `TokenAddressNotSet` if no token contract has been configured.
+    /// - `Overflow` on arithmetic overflow.
+    pub fn purchase_carbon_listing(
+        env: Env,
+        listing_id: u64,
+        buyer: Address,
+    ) -> Result<(), Error> {
+        Self::require_not_paused(&env);
+        buyer.require_auth();
+
+        let mut listing: CarbonListing = env
+            .storage()
+            .instance()
+            .get(&("carb_list", listing_id))
+            .ok_or(Error::CarbonListingNotFound)?;
+
+        if !listing.is_active {
+            return Err(Error::CarbonListingInactive);
+        }
+        if listing.seller == buyer {
+            return Err(Error::InvalidListing);
+        }
+
+        let token_address: Address = env
+            .storage()
+            .instance()
+            .get(&TOKEN_ADDR)
+            .ok_or(Error::TokenAddressNotSet)?;
+
+        let total_price_u128 = listing
+            .amount
+            .checked_mul(listing.price_per_credit as u128)
+            .ok_or(Error::Overflow)?;
+        if total_price_u128 > i128::MAX as u128 {
+            return Err(Error::Overflow);
+        }
+        let total_price = total_price_u128 as i128;
+
+        // Pay seller in tokens
+        let token_client = token::Client::new(&env, &token_address);
+        token_client.transfer(&buyer, &listing.seller, &total_price);
+
+        // Credit buyer's carbon credits
+        let mut buyer_stats: RecyclingStats = env
+            .storage()
+            .instance()
+            .get(&("stats", buyer.clone()))
+            .unwrap_or_else(|| RecyclingStats::new(buyer.clone()));
+        buyer_stats.carbon_credits_earned = buyer_stats
+            .carbon_credits_earned
+            .checked_add(listing.amount)
+            .ok_or(Error::Overflow)?;
+        env.storage()
+            .instance()
+            .set(&("stats", buyer.clone()), &buyer_stats);
+
+        listing.is_active = false;
+        env.storage()
+            .instance()
+            .set(&("carb_list", listing_id), &listing);
+
+        Self::remove_active_listing(&env, listing_id);
+
+        events::emit_carbon_listing_purchased(
+            &env,
+            listing_id,
+            &listing.seller,
+            &buyer,
+            listing.amount,
+            total_price,
+        );
+        Ok(())
+    }
+
+    /// Get a carbon-credit listing by id.
+    pub fn get_carbon_listing(env: Env, listing_id: u64) -> Option<CarbonListing> {
+        env.storage().instance().get(&("carb_list", listing_id))
+    }
+
+    /// Get all currently-active carbon-credit listings.
+    pub fn get_active_carbon_listings(env: Env) -> Vec<CarbonListing> {
+        let idx: Vec<u64> = env
+            .storage()
+            .instance()
+            .get(&CARB_LIST_IDX)
+            .unwrap_or(Vec::new(&env));
+        let mut out: Vec<CarbonListing> = Vec::new(&env);
+        for id in idx.iter() {
+            if let Some(l) = env
+                .storage()
+                .instance()
+                .get::<_, CarbonListing>(&("carb_list", id))
+            {
+                if l.is_active {
+                    out.push_back(l);
+                }
+            }
+        }
+        out
+    }
+
+    fn remove_active_listing(env: &Env, listing_id: u64) {
+        let idx: Vec<u64> = env
+            .storage()
+            .instance()
+            .get(&CARB_LIST_IDX)
+            .unwrap_or(Vec::new(env));
+        let mut new_idx: Vec<u64> = Vec::new(env);
+        for id in idx.iter() {
+            if id != listing_id {
+                new_idx.push_back(id);
+            }
+        }
+        env.storage().instance().set(&CARB_LIST_IDX, &new_idx);
+    }
+
     /// Mark a v2 waste item as contaminated.
     ///
     /// Only a registered Recycler (verifier) may call this.
@@ -3277,6 +3573,174 @@ impl omni-stellar-omni-stellar-scavengerContract {
             .instance()
             .get(&CONTAMINATED_LIST)
             .unwrap_or(Vec::new(&env))
+    }
+
+    // ========== Contamination Scoring & Reporting Workflow ==========
+
+    /// Compute an effective contamination score (0–100) for a v2 waste item.
+    ///
+    /// The score equals the raw `contamination_level`, with a 10-point penalty
+    /// added for grade-D waste (poor quality), capped at 100.
+    /// Returns 0 when the waste has not been marked as contaminated.
+    ///
+    /// # Errors
+    /// Panics if the waste ID does not exist.
+    pub fn get_contamination_score(env: Env, waste_id: u128) -> u32 {
+        let waste: types::Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", waste_id))
+            .expect("Waste not found");
+
+        if !waste.is_contaminated {
+            return 0;
+        }
+
+        let grade_penalty = if waste.grade == WasteGrade::D { 10u32 } else { 0u32 };
+        waste.contamination_level.saturating_add(grade_penalty).min(100)
+    }
+
+    /// Submit a contamination report for a v2 waste item.
+    ///
+    /// Any registered participant may report contamination. The report is stored
+    /// under the waste item's report list. When a waste accumulates 3 or more
+    /// reports, it is automatically marked as contaminated at the median reported
+    /// level and added to the global contaminated-waste list.
+    ///
+    /// # Parameters
+    /// - `waste_id`: ID of the v2 waste to report.
+    /// - `reporter`: Address of the participant submitting the report. Must sign.
+    /// - `level`: Contamination level (0–100).
+    /// - `reason`: Human-readable reason (max 200 chars).
+    ///
+    /// # Errors
+    /// - Panics if the waste does not exist.
+    /// - Panics if `level > 100`.
+    /// - Panics if `reporter` is not a registered participant.
+    pub fn report_contamination(
+        env: Env,
+        waste_id: u128,
+        reporter: Address,
+        level: u32,
+        reason: String,
+    ) -> types::ContaminationReport {
+        reporter.require_auth();
+        Self::require_not_paused(&env);
+
+        assert!(level <= 100, "Contamination level must be 0-100");
+        assert!(reason.len() <= 200, "Reason exceeds 200 characters");
+
+        // Reporter must be registered
+        let _participant: Participant = env
+            .storage()
+            .instance()
+            .get(&(reporter.clone(),))
+            .expect("Reporter not registered");
+
+        // Waste must exist
+        let _waste: types::Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", waste_id))
+            .expect("Waste not found");
+
+        let report = types::ContaminationReport {
+            waste_id,
+            reporter: reporter.clone(),
+            level,
+            reason,
+            reported_at: env.ledger().timestamp(),
+        };
+
+        // Append report to the list for this waste item
+        let reports_key = ("contamination_reports", waste_id);
+        let mut reports: Vec<types::ContaminationReport> = env
+            .storage()
+            .instance()
+            .get(&reports_key)
+            .unwrap_or(Vec::new(&env));
+        reports.push_back(report.clone());
+        env.storage().instance().set(&reports_key, &reports);
+
+        // Auto-mark contaminated when 3+ reports received (median level)
+        if reports.len() >= 3 {
+            let mut levels: Vec<u32> = Vec::new(&env);
+            for r in reports.iter() {
+                levels.push_back(r.level);
+            }
+            // Simple sort via selection sort (no std sort in no_std)
+            let n = levels.len();
+            for i in 0..n {
+                let mut min_idx = i;
+                for j in (i + 1)..n {
+                    if levels.get(j).unwrap() < levels.get(min_idx).unwrap() {
+                        min_idx = j;
+                    }
+                }
+                if min_idx != i {
+                    let tmp = levels.get(i).unwrap();
+                    levels.set(i, levels.get(min_idx).unwrap());
+                    levels.set(min_idx, tmp);
+                }
+            }
+            let median = levels.get(n / 2).unwrap();
+
+            let mut waste: types::Waste = env
+                .storage()
+                .instance()
+                .get(&("waste_v2", waste_id))
+                .unwrap();
+            if !waste.is_contaminated {
+                waste.is_contaminated = true;
+                waste.contamination_level = median;
+                waste.contamination_reason = report.reason.clone();
+                env.storage().instance().set(&("waste_v2", waste_id), &waste);
+
+                let mut list: Vec<u128> = env
+                    .storage()
+                    .instance()
+                    .get(&CONTAMINATED_LIST)
+                    .unwrap_or(Vec::new(&env));
+                if !list.contains(&waste_id) {
+                    list.push_back(waste_id);
+                    env.storage().instance().set(&CONTAMINATED_LIST, &list);
+                }
+
+                events::emit_waste_contaminated(&env, waste_id, &reporter, median);
+            }
+        }
+
+        report
+    }
+
+    /// Return all contamination reports for a v2 waste item.
+    pub fn get_contamination_reports(env: Env, waste_id: u128) -> Vec<types::ContaminationReport> {
+        env.storage()
+            .instance()
+            .get(&("contamination_reports", waste_id))
+            .unwrap_or(Vec::new(&env))
+    }
+
+    // ========== Batch Submit / Verify aliases ==========
+
+    /// Batch-submit multiple materials in a single call.
+    /// Alias for [`submit_materials_batch`] with the name from issue #548.
+    pub fn batch_submit_materials(
+        env: Env,
+        materials: soroban_sdk::Vec<(WasteType, u64, String)>,
+        submitter: Address,
+    ) -> soroban_sdk::Vec<Material> {
+        Self::submit_materials_batch(env, materials, submitter)
+    }
+
+    /// Batch-verify multiple materials in a single call.
+    /// Alias for [`verify_materials_batch`] with the name from issue #548.
+    pub fn batch_verify_materials(
+        env: Env,
+        material_ids: soroban_sdk::Vec<u64>,
+        verifier: Address,
+    ) -> soroban_sdk::Vec<Material> {
+        Self::verify_materials_batch(env, material_ids, verifier)
     }
 
     /// Get global supply-chain statistics.
@@ -5591,7 +6055,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         participant: Address,
         target_weight: u128,
         target_date: u64,
-        waste_type: Option<WasteType>,
+        waste_type: OptionalWasteType,
     ) -> Result<(), Error> {
         participant.require_auth();
         Self::require_not_paused(&env);
