@@ -73,6 +73,12 @@ const WasteCertificationPage = lazy(() =>
 const RecyclingGuidePage = lazy(() =>
   import('@/pages/RecyclingGuidePage').then((m) => ({ default: m.RecyclingGuidePage }))
 )
+const SubscriptionsPage = lazy(() =>
+  import('@/pages/SubscriptionsPage').then((m) => ({ default: m.SubscriptionsPage }))
+)
+const CharityDonationsPage = lazy(() =>
+  import('@/pages/CharityDonationsPage').then((m) => ({ default: m.CharityDonationsPage }))
+)
 
 // eslint-disable-next-line react-refresh/only-export-components
 function PageFallback() {
@@ -125,7 +131,9 @@ export const router = createBrowserRouter([
       { path: 'predictions', element: <PredictiveAnalyticsPage /> },
       { path: 'marketplace', element: <WasteMarketplacePage /> },
       { path: 'certifications', element: <WasteCertificationPage /> },
-      { path: 'recycling-guide', element: <RecyclingGuidePage /> }
+      { path: 'recycling-guide', element: <RecyclingGuidePage /> },
+      { path: 'subscriptions', element: <SubscriptionsPage /> },
+      { path: 'donations', element: <CharityDonationsPage /> }
     ]
   },
   { path: '*', element: <NotFoundPage /> }
