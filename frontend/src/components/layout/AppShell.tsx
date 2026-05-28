@@ -19,12 +19,11 @@ import {
   ShoppingBag,
   Award,
   BookOpen,
-  Leaf,
-  Navigation,
-  Mail,
-  QrCode,
+  CalendarDays,
+  Heart,
+  TrendingUp,
 } from 'lucide-react'
-import { cn } from '@/lib/cn'
+import { cn } from '@/lib/utils'
 import { useWallet } from '@/context/WalletContext'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
@@ -100,28 +99,22 @@ const NAV_LINKS = [
     icon: BookOpen
   },
   {
-    label: 'Impact',
-    href: '/impact',
+    label: 'Subscriptions',
+    href: '/subscriptions',
     roles: ['Recycler', 'Collector', 'Manufacturer'],
-    icon: Leaf
+    icon: CalendarDays
   },
   {
-    label: 'Route Planner',
-    href: '/route-planner',
+    label: 'Donations',
+    href: '/donations',
     roles: ['Recycler', 'Collector', 'Manufacturer'],
-    icon: Navigation
+    icon: Heart
   },
   {
-    label: 'Messages',
-    href: '/messages',
+    label: 'Predictions',
+    href: '/predictions',
     roles: ['Recycler', 'Collector', 'Manufacturer'],
-    icon: Mail
-  },
-  {
-    label: 'QR Scanner',
-    href: '/qr-scanner',
-    roles: ['Recycler', 'Collector', 'Manufacturer'],
-    icon: QrCode
+    icon: TrendingUp
   }
 ]
 
@@ -145,6 +138,9 @@ function getOnboardingDataAttribute(href: string): string | undefined {
     '/marketplace': 'marketplace',
     '/certifications': 'certifications',
     '/recycling-guide': 'recycling-guide',
+    '/subscriptions': 'subscriptions',
+    '/donations': 'donations',
+    '/predictions': 'predictions',
   }
   return attributeMap[href]
 }

@@ -73,11 +73,11 @@ const WasteCertificationPage = lazy(() =>
 const RecyclingGuidePage = lazy(() =>
   import('@/pages/RecyclingGuidePage').then((m) => ({ default: m.RecyclingGuidePage }))
 )
-const ImpactCalculatorPage = lazy(() =>
-  import('@/pages/ImpactCalculatorPage').then((m) => ({ default: m.ImpactCalculatorPage }))
+const SubscriptionsPage = lazy(() =>
+  import('@/pages/SubscriptionsPage').then((m) => ({ default: m.SubscriptionsPage }))
 )
-const QRCodePage = lazy(() =>
-  import('@/pages/QRCodePage').then((m) => ({ default: m.QRCodePage }))
+const CharityDonationsPage = lazy(() =>
+  import('@/pages/CharityDonationsPage').then((m) => ({ default: m.CharityDonationsPage }))
 )
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -132,8 +132,8 @@ export const router = createBrowserRouter([
       { path: 'marketplace', element: <WasteMarketplacePage /> },
       { path: 'certifications', element: <WasteCertificationPage /> },
       { path: 'recycling-guide', element: <RecyclingGuidePage /> },
-      { path: 'impact', element: <ImpactCalculatorPage /> },
-      { path: 'qr-scanner', element: <QRCodePage /> }
+      { path: 'subscriptions', element: <SubscriptionsPage /> },
+      { path: 'donations', element: <CharityDonationsPage /> }
     ]
   },
   { path: '*', element: <NotFoundPage /> }
