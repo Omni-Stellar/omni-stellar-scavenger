@@ -76,8 +76,11 @@ const RecyclingGuidePage = lazy(() =>
 const PerformanceMonitoringPage = lazy(() =>
   import('@/pages/PerformanceMonitoringPage').then((m) => ({ default: m.PerformanceMonitoringPage }))
 )
-const SearchResultsPage = lazy(() =>
-  import('@/pages/SearchResultsPage').then((m) => ({ default: m.SearchResultsPage }))
+const GamificationPage = lazy(() =>
+  import('@/pages/GamificationPage').then((m) => ({ default: m.GamificationPage }))
+)
+const OfflinePage = lazy(() =>
+  import('@/pages/OfflinePage').then((m) => ({ default: m.OfflinePage }))
 )
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -133,7 +136,8 @@ export const router = createBrowserRouter([
       { path: 'certifications', element: <WasteCertificationPage /> },
       { path: 'recycling-guide', element: <RecyclingGuidePage /> },
       { path: 'performance', element: <PerformanceMonitoringPage /> },
-      { path: 'search', element: <SearchResultsPage /> }
+      { path: 'achievements', element: <GamificationPage /> },
+      { path: 'offline', element: <OfflinePage /> }
     ]
   },
   { path: '*', element: <NotFoundPage /> }
