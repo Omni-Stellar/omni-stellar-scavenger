@@ -7,6 +7,7 @@ mod test_grading;
 mod test_transfer_path_validation;
 mod types;
 mod validation;
+mod verification;
 
 pub use errors::Error;
 pub use types::{
@@ -18,6 +19,7 @@ pub use types::{
     TransferItemType, TransferRecord, TransferStatus, Waste, WasteGrade, WasteTransfer, WasteType,
 };
 pub use types::calculate_carbon_credits;
+pub use verification::{VerificationRecord, VerificationState, VerificationWorkflow};
 
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, token, Address, Env, String, Symbol, Vec,
@@ -57,6 +59,10 @@ const DISPUTE_CNT: Symbol = symbol_short!("DISP_CNT");
 
 // Collection route counters (issue #552)
 const ROUTE_CNT: Symbol = symbol_short!("ROUTE_CNT");
+
+// Verification system (issue #653)
+const VERIFICATION_CNT: Symbol = symbol_short!("VER_CNT");
+const VERIFICATION_TIMEOUT: u64 = 7 * 24 * 60 * 60; // 7 days
 
 // Reputation delta constants
 const REP_TRANSFER: i128 = 5;
@@ -6668,6 +6674,208 @@ impl omni-stellar-omni-stellar-scavengerContract {
                 }
             }
         }
+        result
+    }
+
+    // ============ Verification Workflow Functions (Issue #653) ============
+
+    /// Initiates a verification workflow for a waste item
+    pub fn start_verification_workflow(
+        env: Env,
+        waste_id: u128,
+        verifier: Address,
+    ) -> VerificationRecord {
+        Self::require_not_paused(&env);
+        verifier.require_auth();
+
+        // Verify waste exists and is active
+        let waste: Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", waste_id))
+            .expect("Waste not found");
+
+        if !waste.is_active {
+            panic!("Waste is not active");
+        }
+
+        // Verify verifier is registered and has permission
+        let verifier_key = (verifier.clone(),);
+        let participant: Participant = env
+            .storage()
+            .instance()
+            .get(&verifier_key)
+            .expect("Verifier not registered");
+
+        if !participant.is_registered {
+            panic!("Verifier is not registered");
+        }
+
+        if !participant.role.can_process_recyclables() {
+            panic!("Only recyclers can verify materials");
+        }
+
+        // Create verification record
+        let verification_id: u64 = env
+            .storage()
+            .instance()
+            .get(&VERIFICATION_CNT)
+            .unwrap_or(0);
+
+        let mut record = VerificationRecord::new(
+            &env,
+            verification_id,
+            waste_id,
+            verifier.clone(),
+            VERIFICATION_TIMEOUT,
+        );
+
+        record.start_verification().expect("Failed to start verification");
+
+        // Store verification record
+        env.storage()
+            .instance()
+            .set(&("verification", verification_id), &record);
+
+        // Update counter
+        env.storage()
+            .instance()
+            .set(&VERIFICATION_CNT, &(verification_id + 1));
+
+        // Emit event
+        events::emit_verification_started(&env, waste_id, verification_id, &verifier);
+
+        record
+    }
+
+    /// Completes a verification workflow successfully
+    pub fn complete_verification(
+        env: Env,
+        verification_id: u64,
+        quality_score: u32,
+        notes: String,
+    ) -> VerificationRecord {
+        Self::require_not_paused(&env);
+
+        let mut record: VerificationRecord = env
+            .storage()
+            .instance()
+            .get(&("verification", verification_id))
+            .expect("Verification record not found");
+
+        record
+            .complete_verification(&env, quality_score, notes.clone())
+            .expect("Failed to complete verification");
+
+        // Update waste as verified
+        let mut waste: Waste = env
+            .storage()
+            .instance()
+            .get(&("waste_v2", record.waste_id))
+            .expect("Waste not found");
+
+        waste.is_confirmed = true;
+        waste.confirmer = record.verifier.clone();
+
+        env.storage()
+            .instance()
+            .set(&("waste_v2", record.waste_id), &waste);
+
+        // Store updated verification record
+        env.storage()
+            .instance()
+            .set(&("verification", verification_id), &record);
+
+        // Emit event
+        events::emit_verification_completed(&env, record.waste_id, verification_id, quality_score);
+
+        record
+    }
+
+    /// Fails a verification workflow
+    pub fn fail_verification(
+        env: Env,
+        verification_id: u64,
+        reason: String,
+    ) -> VerificationRecord {
+        Self::require_not_paused(&env);
+
+        let mut record: VerificationRecord = env
+            .storage()
+            .instance()
+            .get(&("verification", verification_id))
+            .expect("Verification record not found");
+
+        record
+            .fail_verification(&env, reason.clone())
+            .expect("Failed to fail verification");
+
+        // Store updated verification record
+        env.storage()
+            .instance()
+            .set(&("verification", verification_id), &record);
+
+        // Emit event
+        events::emit_verification_failed(&env, record.waste_id, verification_id);
+
+        record
+    }
+
+    /// Checks and expires timed-out verifications
+    pub fn expire_verification(env: Env, verification_id: u64) -> VerificationRecord {
+        Self::require_not_paused(&env);
+
+        let mut record: VerificationRecord = env
+            .storage()
+            .instance()
+            .get(&("verification", verification_id))
+            .expect("Verification record not found");
+
+        if !record.is_timed_out(env.ledger().timestamp()) {
+            panic!("Verification has not timed out");
+        }
+
+        record.mark_expired().expect("Failed to mark as expired");
+
+        // Store updated verification record
+        env.storage()
+            .instance()
+            .set(&("verification", verification_id), &record);
+
+        // Emit event
+        events::emit_verification_expired(&env, record.waste_id, verification_id);
+
+        record
+    }
+
+    /// Gets a verification record by ID
+    pub fn get_verification(env: Env, verification_id: u64) -> Option<VerificationRecord> {
+        env.storage()
+            .instance()
+            .get(&("verification", verification_id))
+    }
+
+    /// Gets all verifications for a waste item
+    pub fn get_waste_verifications(env: Env, waste_id: u128) -> Vec<u64> {
+        let mut result = Vec::new(&env);
+        let verification_count: u64 = env
+            .storage()
+            .instance()
+            .get(&VERIFICATION_CNT)
+            .unwrap_or(0);
+
+        for id in 0..verification_count {
+            if let Some(record) = env
+                .storage()
+                .instance()
+                .get::<_, VerificationRecord>(&("verification", id))
+            {
+                if record.waste_id == waste_id {
+                    result.push_back(id);
+                }
+            }
+        }
+
         result
     }
 }

@@ -256,3 +256,35 @@ pub fn emit_carbon_listing_purchased(
     env.events()
         .publish((symbol_short!("carb_buy"), listing_id), (seller, buyer, amount, total_price));
 }
+
+// ============ Verification Workflow Events (Issue #653) ============
+
+pub fn emit_verification_started(
+    env: &Env,
+    waste_id: u128,
+    verification_id: u64,
+    verifier: &Address,
+) {
+    env.events()
+        .publish((symbol_short!("ver_start"), verification_id), (waste_id, verifier));
+}
+
+pub fn emit_verification_completed(
+    env: &Env,
+    waste_id: u128,
+    verification_id: u64,
+    quality_score: u32,
+) {
+    env.events()
+        .publish((symbol_short!("ver_comp"), verification_id), (waste_id, quality_score));
+}
+
+pub fn emit_verification_failed(env: &Env, waste_id: u128, verification_id: u64) {
+    env.events()
+        .publish((symbol_short!("ver_fail"), verification_id), waste_id);
+}
+
+pub fn emit_verification_expired(env: &Env, waste_id: u128, verification_id: u64) {
+    env.events()
+        .publish((symbol_short!("ver_exp"), verification_id), waste_id);
+}
