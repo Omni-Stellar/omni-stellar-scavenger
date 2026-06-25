@@ -1,6 +1,6 @@
 use soroban_sdk::{symbol_short, Address, Env, Symbol};
 
-use crate::types::{ParticipantRole, WasteGrade, WasteType, CertificationLevel};
+use crate::types::{ParticipantRole, WasteGrade, WasteType, CertificationLevel, ParticipantTier};
 
 const WASTE_REGISTERED: Symbol = symbol_short!("recycled");
 const DONATION_MADE: Symbol = symbol_short!("donated");
@@ -157,6 +157,19 @@ pub fn emit_waste_contaminated(env: &Env, waste_id: u128, verifier: &Address, le
 pub fn emit_certification_granted(env: &Env, participant: &Address, level: CertificationLevel) {
     env.events()
         .publish((CERTIFICATION_GRANTED, participant), level.to_u32());
+}
+
+/// Emit event when a participant's tier changes
+pub fn emit_participant_tier_changed(
+    env: &Env,
+    participant: &Address,
+    old_tier: ParticipantTier,
+    new_tier: ParticipantTier,
+) {
+    env.events().publish(
+        (symbol_short!("tier_upd"), participant),
+        (old_tier as u32, new_tier as u32),
+    );
 }
 
 /// Emit event when an auction is created
@@ -346,4 +359,12 @@ pub fn emit_custom_query_created(env: &Env, query_id: u64) {
 pub fn emit_custom_query_executed(env: &Env, query_id: u64) {
     env.events()
         .publish((symbol_short!("qry_exe"), query_id), ());
+}
+
+/// Emit event when a waste batch is processed
+pub fn emit_batch_processed(env: &Env, batch_id: u64, processor: &Address, note: &String) {
+    env.events().publish(
+        (symbol_short!("batch_proc"), batch_id),
+        (processor, note),
+    );
 }
