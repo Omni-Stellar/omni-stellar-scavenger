@@ -1,0 +1,15 @@
+# Global owners
+* @Omni-Stellar
+
+# Smart contract
+/stellar-contract/ @Omni-Stellar
+/contracts/ @Omni-Stellar
+
+# Frontend
+/frontend/ @Omni-Stellar
+
+# CI/CD
+/.github/ @Omni-Stellar
+
+# Docs
+/docs/ @Omni-Stellar
