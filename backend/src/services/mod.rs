@@ -9,7 +9,7 @@ pub mod api;
 pub mod webhook;
 pub mod export;
 pub mod audit;
-pub mod verification;
+pub mod analytics;
 
 pub use email::{EmailService, SendGridEmailService};
 pub use notifications::{NotificationService, FirebaseNotificationService};
@@ -22,4 +22,4 @@ pub use api::ApiBuilder;
 pub use webhook::{WebhookManager, WebhookEvent, Webhook};
 pub use export::{ExportService, ExportFormat, ExportData};
 pub use audit::{AuditService, AuditEntry, AuditEventType, AuditAction, AuditQuery};
-pub use verification::{VerificationService, DefaultVerificationService, ParticipantVerification, VerificationStatus};
+pub use analytics::{AnalyticsService, Metric, ParticipantAnalytics, GlobalAnalytics, AnomalyFlag};
