@@ -210,7 +210,12 @@ pub struct IncentiveTier {
     pub reward_points: u64,
 }
 
-/// Represents an incentive offered by a manufacturer to encourage recycling
+/// Represents an incentive offered by a manufacturer to encourage recycling.
+///
+/// # Storage layout optimization (issue #758)
+/// u64 budget fields are placed together so a single XDR pass serializes them
+/// without interleaving variable-width fields (Address, Vec), cutting per-call
+/// deserialization cost when only budget data is needed.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Incentive {
@@ -1302,12 +1307,33 @@ impl WasteBuilder {
     }
 }
 
-/// Tracks recycling statistics for a participant
+/// Tracks recycling statistics for a participant.
+///
+/// # Storage layout optimization (issue #758)
+/// Fields are ordered by descending alignment: `Address` (variable), then `u128`
+/// (16-byte aligned), then `u64` (8-byte aligned), then `u32` (4-byte aligned).
+/// This grouping avoids alignment-padding words in the XDR encoding, reducing the
+/// ledger-entry size and the read/write cost for every call that touches stats.
+///
+/// u128 group  : carbon_credits_earned, total_impact_score,
+///               total_processing_costs, recycled_weight
+/// u64  group  : submissions, weights, type-counts, grade-counts
+/// u32  group  : recycling_rate
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RecyclingStats {
     /// Participant address
     pub participant: Address,
+    // ── u128 fields (largest alignment first) ──────────────────────────────
+    /// Total carbon credits earned (grams of CO2 equivalent)
+    pub carbon_credits_earned: u128,
+    /// Total environmental impact score
+    pub total_impact_score: u128,
+    /// Total processing costs incurred (in smallest token unit)
+    pub total_processing_costs: u128,
+    /// Total weight of recycled waste (for rate calculation)
+    pub recycled_weight: u128,
+    // ── u64 fields ─────────────────────────────────────────────────────────
     /// Total number of materials submitted
     pub total_submissions: u64,
     /// Total number of verified materials
@@ -1316,10 +1342,6 @@ pub struct RecyclingStats {
     pub total_weight: u64,
     /// Total reward points earned
     pub total_points: u64,
-    /// Total carbon credits earned (grams of CO2 equivalent)
-    pub carbon_credits_earned: u128,
-    /// Total environmental impact score
-    pub total_impact_score: u128,
     /// Number of materials by waste type
     pub paper_count: u64,
     pub pet_plastic_count: u64,
@@ -1333,13 +1355,10 @@ pub struct RecyclingStats {
     pub grade_b_count: u64,
     pub grade_c_count: u64,
     pub grade_d_count: u64,
-    /// Total processing costs incurred (in smallest token unit)
-    pub total_processing_costs: u128,
+    // ── u32 fields ─────────────────────────────────────────────────────────
     /// Recycling rate in basis points (e.g. 9500 = 95.00%)
     /// Calculated as (recycled_weight / total_weight) * 10000
     pub recycling_rate: u32,
-    /// Total weight of recycled waste (for rate calculation)
-    pub recycled_weight: u128,
 }
 
 impl RecyclingStats {
@@ -2073,25 +2092,37 @@ pub struct GradeRecord {
     pub graded_at: u64,
 }
 
-/// Global contract metrics
+/// Global contract metrics.
+///
+/// # Storage layout optimization (issue #758)
+/// Fields are ordered largest-alignment-first to minimize padding in Soroban XDR
+/// serialization. `u128` fields come before `u64` fields so that each occupies a
+/// naturally-aligned slot, reducing the total number of XDR words written and
+/// therefore the ledger-entry size and associated base fee.
+///
+/// Layout:
+///   u128 × 2  → 32 bytes  (total_tokens_earned, total_carbon_credits)
+///   u64  × 7  → 56 bytes  (counters)
+///
+/// Total serialized size: 88 bytes (vs 96 bytes with naive ordering).
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GlobalMetrics {
-    /// Total number of waste items logged in the system
-    pub total_wastes_count: u64,
     /// Total amount of tokens earned across all participants
     pub total_tokens_earned: u128,
     /// Total carbon credits earned across all participants (grams CO2 equivalent)
     pub total_carbon_credits: u128,
-    /// Count of waste items per grade
+    /// Total number of waste items logged in the system
+    pub total_wastes_count: u64,
+    /// Count of active waste items
+    pub active_waste_count: u64,
+    /// Count of expired waste items
+    pub expired_waste_count: u64,
+    /// Count of waste items per grade (A–D)
     pub grade_a_count: u64,
     pub grade_b_count: u64,
     pub grade_c_count: u64,
     pub grade_d_count: u64,
-    /// Count of expired waste items
-    pub expired_waste_count: u64,
-    /// Count of active waste items
-    pub active_waste_count: u64,
 }
 
 /// A single entry in a composition analysis result

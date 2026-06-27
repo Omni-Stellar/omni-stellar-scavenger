@@ -255,3 +255,160 @@ pub enum Error {
     /// Returned by: `reconcile_waste`
     ReconciliationThresholdExceeded = 54,
 }
+
+// ── Issue #760: error categorization and context ──────────────────────────────
+
+/// High-level category for an [`Error`].
+/// Lets clients handle errors without switching on every variant.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ErrorCategory {
+    /// Caller lacks permission or is not registered.
+    Auth,
+    /// A supplied value is out of range or malformed.
+    Input,
+    /// The entity is in the wrong lifecycle state.
+    State,
+    /// The requested entity does not exist.
+    NotFound,
+    /// Arithmetic overflow/underflow.
+    Arithmetic,
+    /// A required contract configuration value is missing.
+    Config,
+}
+
+impl Error {
+    /// Returns the high-level [`ErrorCategory`] for this error.
+    pub fn category(self) -> ErrorCategory {
+        match self {
+            Error::AlreadyInitialized
+            | Error::Unauthorized
+            | Error::NotRegistered
+            | Error::AlreadyRegistered
+            | Error::NotManufacturer
+            | Error::NotWasteOwner
+            | Error::NotCreator
+            | Error::NotReserver
+            | Error::NotListingSeller
+            | Error::PermissionDenied
+            | Error::InvalidPermission
+            | Error::SelfConfirmation => ErrorCategory::Auth,
+
+            Error::InvalidAmount
+            | Error::InvalidWeight
+            | Error::InvalidCoordinates
+            | Error::InvalidPercentage
+            | Error::InvalidTransferRoute
+            | Error::SameAddress
+            | Error::TooManySplits
+            | Error::TooFewSplits
+            | Error::TooFewWastes
+            | Error::TooManyWastes
+            | Error::WeightMismatch
+            | Error::LocationMismatch
+            | Error::InvalidSchedule
+            | Error::InvalidListing => ErrorCategory::Input,
+
+            Error::WasteDeactivated
+            | Error::WasteAlreadyDeactivated
+            | Error::WasteAlreadyConfirmed
+            | Error::WasteNotConfirmed
+            | Error::WasteTypeMismatch
+            | Error::WasteTypeMismatchMerge
+            | Error::WasteAlreadyReserved
+            | Error::WasteNotReserved
+            | Error::WasteReservedByOther
+            | Error::WasteExpired
+            | Error::WasteFrozen
+            | Error::IncentiveInactive
+            | Error::MaterialNotVerified
+            | Error::NoRewardAvailable
+            | Error::InsufficientBalance
+            | Error::InsufficientBudget
+            | Error::InsufficientCarbonCredits
+            | Error::CarbonListingInactive
+            | Error::NoDiscrepancy
+            | Error::ReconciliationThresholdExceeded => ErrorCategory::State,
+
+            Error::WasteNotFound
+            | Error::MaterialNotFound
+            | Error::IncentiveNotFound
+            | Error::ParticipantNotFound
+            | Error::CarbonListingNotFound => ErrorCategory::NotFound,
+
+            Error::Overflow => ErrorCategory::Arithmetic,
+
+            Error::CharityNotSet | Error::TokenAddressNotSet => ErrorCategory::Config,
+        }
+    }
+
+    /// Returns a stable machine-readable code string for logging/API responses.
+    /// Format: `"CATEGORY/VARIANT"`, e.g. `"AUTH/UNAUTHORIZED"`.
+    pub fn code(self) -> &'static str {
+        match self {
+            Error::AlreadyInitialized => "AUTH/ALREADY_INITIALIZED",
+            Error::Unauthorized => "AUTH/UNAUTHORIZED",
+            Error::NotRegistered => "AUTH/NOT_REGISTERED",
+            Error::AlreadyRegistered => "AUTH/ALREADY_REGISTERED",
+            Error::NotManufacturer => "AUTH/NOT_MANUFACTURER",
+            Error::NotWasteOwner => "AUTH/NOT_WASTE_OWNER",
+            Error::NotCreator => "AUTH/NOT_CREATOR",
+            Error::NotReserver => "AUTH/NOT_RESERVER",
+            Error::NotListingSeller => "AUTH/NOT_LISTING_SELLER",
+            Error::PermissionDenied => "AUTH/PERMISSION_DENIED",
+            Error::InvalidPermission => "AUTH/INVALID_PERMISSION",
+            Error::SelfConfirmation => "AUTH/SELF_CONFIRMATION",
+            Error::InvalidAmount => "INPUT/INVALID_AMOUNT",
+            Error::InvalidWeight => "INPUT/INVALID_WEIGHT",
+            Error::InvalidCoordinates => "INPUT/INVALID_COORDINATES",
+            Error::InvalidPercentage => "INPUT/INVALID_PERCENTAGE",
+            Error::InvalidTransferRoute => "INPUT/INVALID_TRANSFER_ROUTE",
+            Error::SameAddress => "INPUT/SAME_ADDRESS",
+            Error::TooManySplits => "INPUT/TOO_MANY_SPLITS",
+            Error::TooFewSplits => "INPUT/TOO_FEW_SPLITS",
+            Error::TooFewWastes => "INPUT/TOO_FEW_WASTES",
+            Error::TooManyWastes => "INPUT/TOO_MANY_WASTES",
+            Error::WeightMismatch => "INPUT/WEIGHT_MISMATCH",
+            Error::LocationMismatch => "INPUT/LOCATION_MISMATCH",
+            Error::InvalidSchedule => "INPUT/INVALID_SCHEDULE",
+            Error::InvalidListing => "INPUT/INVALID_LISTING",
+            Error::WasteDeactivated => "STATE/WASTE_DEACTIVATED",
+            Error::WasteAlreadyDeactivated => "STATE/WASTE_ALREADY_DEACTIVATED",
+            Error::WasteAlreadyConfirmed => "STATE/WASTE_ALREADY_CONFIRMED",
+            Error::WasteNotConfirmed => "STATE/WASTE_NOT_CONFIRMED",
+            Error::WasteTypeMismatch => "STATE/WASTE_TYPE_MISMATCH",
+            Error::WasteTypeMismatchMerge => "STATE/WASTE_TYPE_MISMATCH_MERGE",
+            Error::WasteAlreadyReserved => "STATE/WASTE_ALREADY_RESERVED",
+            Error::WasteNotReserved => "STATE/WASTE_NOT_RESERVED",
+            Error::WasteReservedByOther => "STATE/WASTE_RESERVED_BY_OTHER",
+            Error::WasteExpired => "STATE/WASTE_EXPIRED",
+            Error::WasteFrozen => "STATE/WASTE_FROZEN",
+            Error::IncentiveInactive => "STATE/INCENTIVE_INACTIVE",
+            Error::MaterialNotVerified => "STATE/MATERIAL_NOT_VERIFIED",
+            Error::NoRewardAvailable => "STATE/NO_REWARD_AVAILABLE",
+            Error::InsufficientBalance => "STATE/INSUFFICIENT_BALANCE",
+            Error::InsufficientBudget => "STATE/INSUFFICIENT_BUDGET",
+            Error::InsufficientCarbonCredits => "STATE/INSUFFICIENT_CARBON_CREDITS",
+            Error::CarbonListingInactive => "STATE/CARBON_LISTING_INACTIVE",
+            Error::NoDiscrepancy => "STATE/NO_DISCREPANCY",
+            Error::ReconciliationThresholdExceeded => "STATE/RECONCILIATION_THRESHOLD_EXCEEDED",
+            Error::WasteNotFound => "NOT_FOUND/WASTE",
+            Error::MaterialNotFound => "NOT_FOUND/MATERIAL",
+            Error::IncentiveNotFound => "NOT_FOUND/INCENTIVE",
+            Error::ParticipantNotFound => "NOT_FOUND/PARTICIPANT",
+            Error::CarbonListingNotFound => "NOT_FOUND/CARBON_LISTING",
+            Error::Overflow => "ARITHMETIC/OVERFLOW",
+            Error::CharityNotSet => "CONFIG/CHARITY_NOT_SET",
+            Error::TokenAddressNotSet => "CONFIG/TOKEN_ADDRESS_NOT_SET",
+        }
+    }
+
+    /// Returns `true` if the caller can recover by fixing their inputs.
+    pub fn is_caller_error(self) -> bool {
+        matches!(self.category(), ErrorCategory::Auth | ErrorCategory::Input)
+    }
+
+    /// Returns `true` if this error represents a missing entity.
+    pub fn is_not_found(self) -> bool {
+        self.category() == ErrorCategory::NotFound
+    }
+}

@@ -1,10 +1,8 @@
 #![no_std]
 
+// ── Core contract modules ─────────────────────────────────────────────────────
 mod errors;
 mod events;
-mod test_expiration;
-mod test_grading;
-mod test_transfer_path_validation;
 mod types;
 mod validation;
 mod verification;
@@ -12,6 +10,21 @@ mod upgrade;
 mod explorer;
 mod analytics;
 mod audit_log;
+
+// ── Issue #759: extracted functional modules ──────────────────────────────────
+/// Participant registration, role checks, and reputation helpers.
+pub mod participant;
+/// Waste lifecycle state guards and transfer-route validation.
+pub mod waste;
+/// Incentive creation, scheduling, and reward-claim helpers.
+pub mod incentive;
+/// On-chain aggregation helpers for stats and metrics.
+pub mod contract_analytics;
+
+// ── Internal test modules (compile-time only) ─────────────────────────────────
+mod test_expiration;
+mod test_grading;
+mod test_transfer_path_validation;
 
 pub use errors::Error;
 pub use types::{
@@ -35,6 +48,19 @@ use soroban_sdk::{
 };
 
 // Storage keys
+//
+// Storage layout strategy (issue #758):
+// ─────────────────────────────────────
+// • Instance storage  – small, frequently-read scalars that are loaded on
+//   every contract invocation (admin, reward config, reentrancy guard, pause
+//   flag).  Kept to a minimum to reduce the base ledger-entry read fee.
+// • Persistent storage – per-entity records keyed by address or ID.
+//   Uses typed enum keys to avoid string hashing overhead.
+// • Temporary storage  – ephemeral values (reentrancy guard) that must not
+//   survive TTL expiry.
+//
+// Symbol names are kept ≤ 9 chars (Soroban Symbol limit) and are documented
+// here so that future storage migrations have a clear audit trail.
 const ADMINS: Symbol = symbol_short!("ADMINS");
 const CHARITY: Symbol = symbol_short!("CHARITY");
 const REWARD_CFG: Symbol = symbol_short!("RWD_CFG");
