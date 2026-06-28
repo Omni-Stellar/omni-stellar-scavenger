@@ -7,3 +7,4 @@ pub mod verification;
 pub mod compliance_api;
 pub mod signing_api;
 pub mod search;
+pub mod archival;
