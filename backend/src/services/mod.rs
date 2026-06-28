@@ -16,6 +16,8 @@ pub mod geospatial;
 pub mod contract_upgrades;
 pub mod encryption;
 pub mod encryption_verification;
+pub mod archival;
+pub mod archival_storage;
 
 pub use email::{EmailService, SendGridEmailService};
 pub use notifications::{NotificationService, FirebaseNotificationService};
@@ -31,3 +33,8 @@ pub use audit::{AuditService, AuditEntry, AuditEventType, AuditAction, AuditQuer
 pub use analytics::{AnalyticsService, Metric, ParticipantAnalytics, GlobalAnalytics, AnomalyFlag};
 pub use encryption::{DataEncryptionService, EncryptionKey, EncryptedData, EncryptionMetrics};
 pub use encryption_verification::EncryptionMonitoringService;
+pub use archival::{
+    ArchivalService, RetentionPolicy, ArchiveRecord, ArchiveJob, ArchiveStatus,
+    StorageTier, ArchiveQuery, ArchiveStats, ArchivalNotification,
+};
+pub use archival_storage::{FileSystemArchivalStorage, S3ArchivalStorage};

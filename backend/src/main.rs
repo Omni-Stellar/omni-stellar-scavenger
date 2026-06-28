@@ -13,10 +13,11 @@ use services::{
     EmailService, SendGridEmailService, NotificationService, FirebaseNotificationService,
     ReportService, ReportingService, StorageService, S3StorageService,
     WebhookManager, ExportService, AuditService, VerificationService, DefaultVerificationService,
+    ArchivalService, FileSystemArchivalStorage,
 };
 use middleware::{RateLimitMiddleware, RateLimitConfig, ValidationMiddleware, CsrfMiddleware};
 use cache::Cache;
-use api::{contracts, ws, export, audit, verification, compliance_api, signing_api, search as search_api};
+use api::{contracts, ws, export, audit, verification, compliance_api, signing_api, search as search_api, archival as archival_api};
 use std::sync::Arc;
 use tracing::info;
 use tracing_subscriber::{fmt, EnvFilter, prelude::*};
@@ -91,6 +92,16 @@ async fn main() -> std::io::Result<()> {
             return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
         }
     };
+    
+    // Initialize archival service
+    let archival_storage_path = std::env::var("ARCHIVAL_STORAGE_PATH")
+        .unwrap_or_else(|_| "/tmp/archives".to_string());
+    let archival_storage = Arc::new(FileSystemArchivalStorage::new(
+        std::path::PathBuf::from(archival_storage_path)
+    ));
+    let archival_service = Arc::new(ArchivalService::new(archival_storage));
+    
+    info!("Archival service initialized");
 
     info!(
         cache_ttl = 300,
@@ -131,6 +142,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(verification_service.clone()))
             .app_data(web::Data::new(ws_manager.clone()))
             .app_data(web::Data::new(search_client.clone()))
+            .app_data(web::Data::new(archival_service.clone()))
             // Health
             .route("/health", web::get().to(health_check))
             // Contract Queries (Task 1)
@@ -196,6 +208,19 @@ async fn main() -> std::io::Result<()> {
             .route("/api/v1/search", web::get().to(search_api::search))
             .route("/api/v1/search/suggest", web::get().to(search_api::suggest))
             .route("/api/v1/search/config", web::get().to(search_api::get_search_config))
+            // Archival (Task 9)
+            .route("/api/v1/archival/policies", web::post().to(archival_api::create_policy))
+            .route("/api/v1/archival/policies", web::get().to(archival_api::list_policies))
+            .route("/api/v1/archival/policies/{id}", web::get().to(archival_api::get_policy))
+            .route("/api/v1/archival/policies/{id}", web::put().to(archival_api::update_policy))
+            .route("/api/v1/archival/policies/{id}", web::delete().to(archival_api::delete_policy))
+            .route("/api/v1/archival/archives", web::get().to(archival_api::query_archives))
+            .route("/api/v1/archival/archives", web::post().to(archival_api::archive_data))
+            .route("/api/v1/archival/archives/{id}", web::delete().to(archival_api::delete_archive))
+            .route("/api/v1/archival/archives/{id}/restore", web::post().to(archival_api::restore_data))
+            .route("/api/v1/archival/stats", web::get().to(archival_api::get_statistics))
+            .route("/api/v1/archival/jobs", web::get().to(archival_api::list_jobs))
+            .route("/api/v1/archival/jobs/{id}", web::get().to(archival_api::get_job))
     })
     .bind("0.0.0.0:8080")?
     .run()
