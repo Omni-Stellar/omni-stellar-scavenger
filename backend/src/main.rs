@@ -5,6 +5,7 @@ mod cache;
 mod compliance;
 mod security;
 mod validation;
+mod search;
 
 use actix_web::{web, App, HttpServer, HttpResponse};
 use actix_cors::Cors;
@@ -15,7 +16,7 @@ use services::{
 };
 use middleware::{RateLimitMiddleware, RateLimitConfig, ValidationMiddleware, CsrfMiddleware};
 use cache::Cache;
-use api::{contracts, ws, export, audit, verification, compliance_api, signing_api};
+use api::{contracts, ws, export, audit, verification, compliance_api, signing_api, search as search_api};
 use std::sync::Arc;
 use tracing::info;
 use tracing_subscriber::{fmt, EnvFilter, prelude::*};
@@ -70,6 +71,26 @@ async fn main() -> std::io::Result<()> {
     let csrf_secret = std::env::var("CSRF_SECRET").unwrap_or_else(|_| "change-me-in-production".to_string());
     let allowed_origins = std::env::var("ALLOWED_ORIGINS")
         .unwrap_or_else(|_| "http://localhost:3000".to_string());
+    
+    // Initialize search client
+    let search_config = search::SearchClientConfig {
+        url: std::env::var("ELASTICSEARCH_URL").unwrap_or_else(|_| "http://localhost:9200".to_string()),
+        username: std::env::var("ELASTICSEARCH_USERNAME").ok(),
+        password: std::env::var("ELASTICSEARCH_PASSWORD").ok(),
+        timeout_seconds: 30,
+        validate_certificates: true,
+    };
+    
+    let search_client = match search::SearchClient::new(search_config) {
+        Ok(client) => {
+            info!("Search client initialized successfully");
+            Arc::new(client)
+        }
+        Err(e) => {
+            info!("Failed to initialize search client: {}. Search functionality will be limited.", e);
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
+        }
+    };
 
     info!(
         cache_ttl = 300,
@@ -109,6 +130,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(audit_service.clone()))
             .app_data(web::Data::new(verification_service.clone()))
             .app_data(web::Data::new(ws_manager.clone()))
+            .app_data(web::Data::new(search_client.clone()))
             // Health
             .route("/health", web::get().to(health_check))
             // Contract Queries (Task 1)
@@ -170,6 +192,10 @@ async fn main() -> std::io::Result<()> {
             .route("/api/v1/signing/events", web::get().to(signing_api::list_events))
             .route("/api/v1/signing/revocations", web::get().to(signing_api::list_revocations))
             .route("/api/v1/signing/documentation", web::get().to(signing_api::get_documentation))
+            // Search (Task 8)
+            .route("/api/v1/search", web::get().to(search_api::search))
+            .route("/api/v1/search/suggest", web::get().to(search_api::suggest))
+            .route("/api/v1/search/config", web::get().to(search_api::get_search_config))
     })
     .bind("0.0.0.0:8080")?
     .run()
