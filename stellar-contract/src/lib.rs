@@ -11,6 +11,8 @@ mod explorer;
 mod analytics;
 mod audit_log;
 mod storage_utils;
+mod storage_optimizer;
+mod query_optimizer;
 
 // ── Issue #759: extracted functional modules ──────────────────────────────────
 /// Participant registration, role checks, and reputation helpers.
