@@ -100,5 +100,18 @@
     "notifications": "Notifications",
     "darkMode": "Dark Mode",
     "lightMode": "Light Mode"
+  },
+  "locale": {
+    "currency": "Currency",
+    "units": "Measurement Units",
+    "weight": "Weight",
+    "distance": "Distance",
+    "weightKg": "Kilograms (kg)",
+    "weightLb": "Pounds (lb)",
+    "distanceKm": "Kilometres (km)",
+    "distanceMi": "Miles (mi)",
+    "localeOverride": "Locale Override",
+    "autoDetect": "Auto-detect",
+    "formatExample": "Format Example"
   }
 }

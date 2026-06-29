@@ -128,6 +128,9 @@ const PlatformHealthDashboardPage = lazy(() =>
 const PerformanceSLAsPage = lazy(() =>
   import('@/pages/PerformanceSLAsPage').then((m) => ({ default: m.PerformanceSLAsPage }))
 )
+const GovernancePage = lazy(() =>
+  import('@/pages/GovernancePage').then((m) => ({ default: m.GovernancePage }))
+)
 
 // eslint-disable-next-line react-refresh/only-export-components
 function PageFallback() {
@@ -170,6 +173,7 @@ export const router = createBrowserRouter([
       { path: 'rewards', element: <RewardsPage /> },
       { path: 'tracker', element: <SupplyChainTrackerPage /> },
       { path: 'community', element: <CommunityPage /> },
+      { path: 'governance', element: <GovernancePage /> },
       { path: 'analytics', element: <AnalyticsPage /> },
       { path: 'map', element: <WasteMapPage /> },
       { path: 'admin', element: <AdminDashboardPage /> },

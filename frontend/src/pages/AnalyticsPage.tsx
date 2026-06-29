@@ -1,4 +1,5 @@
-import { BarChart3, TrendingUp, Package, Users, Download, PieChart, Activity, Medal } from 'lucide-react'
+import { BarChart3, TrendingUp, Package, Users, Download, Activity, Medal } from 'lucide-react'
+import { UserBehaviorDashboard } from '@/components/analytics/UserBehaviorDashboard'
 import { StatCard } from '@/components/ui/StatCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -237,6 +238,12 @@ export function AnalyticsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <LeaderboardCard />
         <CarbonImpactCard />
+      </div>
+
+      {/* User Behavior Analytics */}
+      <div>
+        <h2 className="mb-4 text-xl font-semibold">User Behavior Analytics</h2>
+        <UserBehaviorDashboard />
       </div>
     </div>
   )

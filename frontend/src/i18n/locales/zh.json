@@ -100,5 +100,18 @@
     "notifications": "通知",
     "darkMode": "深色模式",
     "lightMode": "浅色模式"
+  },
+  "locale": {
+    "currency": "货币",
+    "units": "计量单位",
+    "weight": "重量",
+    "distance": "距离",
+    "weightKg": "千克 (kg)",
+    "weightLb": "磅 (lb)",
+    "distanceKm": "千米 (km)",
+    "distanceMi": "英里 (mi)",
+    "localeOverride": "区域覆盖",
+    "autoDetect": "自动检测",
+    "formatExample": "格式示例"
   }
 }
