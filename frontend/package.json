@@ -19,6 +19,7 @@
     "smoke:ci": "SMOKE=1 playwright test --project=smoke --reporter=list,html",
     "a11y": "playwright test --grep 'Accessibility|Keyboard Navigation'",
     "a11y:ui": "playwright test --grep 'Accessibility|Keyboard Navigation' --ui",
+    "a11y:audit": "node scripts/a11y-audit.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
