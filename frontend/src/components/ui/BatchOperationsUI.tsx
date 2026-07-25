@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { CheckSquare, Square, Trash2, Send, Check, Tag, Download } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { BATCH_OPERATIONS, BatchOperation } from '@/lib/batchOperations';
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
 
 interface BatchOperationsUIProps {
   selectedCount: number;
@@ -24,15 +26,15 @@ interface ConfirmDialogState {
 const getOperationIcon = (operationId: string) => {
   switch (operationId) {
     case 'transfer':
-      return <Send className="w-4 h-4" />;
+      return <Send className="w-4 h-4" aria-hidden="true" />;
     case 'verify':
-      return <Check className="w-4 h-4" />;
+      return <Check className="w-4 h-4" aria-hidden="true" />;
     case 'delete':
-      return <Trash2 className="w-4 h-4" />;
+      return <Trash2 className="w-4 h-4" aria-hidden="true" />;
     case 'export':
-      return <Download className="w-4 h-4" />;
+      return <Download className="w-4 h-4" aria-hidden="true" />;
     case 'tag':
-      return <Tag className="w-4 h-4" />;
+      return <Tag className="w-4 h-4" aria-hidden="true" />;
     default:
       return null;
   }
@@ -51,18 +53,18 @@ export const BatchOperationsUI: React.FC<BatchOperationsUIProps> = ({
   });
   const [tagInput, setTagInput] = useState('');
 
-  const handleOperationClick = (operation: BatchOperation) => {
+  // Ref to the button that opened the confirm modal — focus is returned on close
+  const lastTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleOperationClick = (
+    operation: BatchOperation,
+    buttonEl: HTMLButtonElement
+  ) => {
+    lastTriggerRef.current = buttonEl;
     if (operation.requiresConfirmation) {
-      setConfirmDialog({
-        isOpen: true,
-        operation,
-      });
+      setConfirmDialog({ isOpen: true, operation });
     } else if (operation.id === 'tag') {
-      setConfirmDialog({
-        isOpen: true,
-        operation,
-        params: { tag: tagInput },
-      });
+      setConfirmDialog({ isOpen: true, operation, params: { tag: tagInput } });
     } else {
       executeOperation(operation);
     }
@@ -71,15 +73,22 @@ export const BatchOperationsUI: React.FC<BatchOperationsUIProps> = ({
   const executeOperation = async (operation: BatchOperation) => {
     try {
       await onExecuteOperation(operation.id, confirmDialog.params);
-      setConfirmDialog({ isOpen: false });
+      closeConfirm();
       setTagInput('');
     } catch (error) {
       console.error('Operation failed:', error);
     }
   };
 
+  const closeConfirm = () => {
+    setConfirmDialog({ isOpen: false });
+    // Restore focus to the triggering button
+    setTimeout(() => lastTriggerRef.current?.focus(), 0);
+  };
+
   const isAllSelected = selectedCount === totalCount && totalCount > 0;
   const hasSelection = selectedCount > 0;
+  const operation = confirmDialog.operation;
 
   return (
     <div className="space-y-4">
@@ -118,10 +127,10 @@ export const BatchOperationsUI: React.FC<BatchOperationsUIProps> = ({
         <div className="space-y-3">
           <p className="text-sm font-medium text-gray-700">Batch Actions</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {BATCH_OPERATIONS.map((operation) => (
+            {BATCH_OPERATIONS.map((op) => (
               <button
-                key={operation.id}
-                onClick={() => handleOperationClick(operation)}
+                key={op.id}
+                onClick={(e) => handleOperationClick(op, e.currentTarget)}
                 disabled={isLoading}
                 aria-label={`${operation.name} ${selectedCount} selected item${selectedCount !== 1 ? 's' : ''}`}
                 className={cn(
@@ -201,8 +210,25 @@ export const BatchOperationsUI: React.FC<BatchOperationsUIProps> = ({
               </button>
             </div>
           </div>
+        )}
+
+        <div className="flex gap-3 justify-end pt-2">
+          <Button
+            variant="outline"
+            onClick={closeConfirm}
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => operation && executeOperation(operation)}
+            disabled={isLoading || (operation?.id === 'tag' && !tagInput.trim())}
+            variant={operation?.id === 'delete' ? 'destructive' : 'primary'}
+          >
+            {isLoading ? 'Processing…' : 'Confirm'}
+          </Button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 };
