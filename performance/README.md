@@ -18,6 +18,10 @@ We use [k6](https://k6.io/) for load, stress, and endurance testing.
 
 ## Running Tests
 
+Requires a running environment (see the
+[Developer Onboarding Guide](../docs/DEVELOPER_ONBOARDING.md#development-environment-setup))
+plus [k6](https://k6.io) installed locally.
+
 To run the full suite:
 ```bash
 ./performance/run-perf-tests.sh
