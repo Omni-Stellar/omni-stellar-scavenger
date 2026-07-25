@@ -5,6 +5,7 @@ import { RequestBuilder } from './RequestBuilder';
 import { ResponseViewer } from './ResponseViewer';
 import { RequestHistory } from './RequestHistory';
 import { ExampleRequests } from './ExampleRequests';
+import { createApiClient, ApiError } from '@/lib/apiClient';
 
 const DEFAULT_REQUEST: ApiRequest = {
   id: uuidv4(),
@@ -20,29 +21,6 @@ const DEFAULT_REQUEST: ApiRequest = {
   auth: { type: 'none' },
 };
 
-function buildUrl(baseUrl: string, req: ApiRequest): string {
-  const enabledParams = req.queryParams.filter((p) => p.enabled && p.key);
-  if (enabledParams.length === 0) return baseUrl + req.url;
-  const qs = new URLSearchParams(enabledParams.map((p) => [p.key, p.value])).toString();
-  return `${baseUrl}${req.url}?${qs}`;
-}
-
-function buildHeaders(req: ApiRequest): Record<string, string> {
-  const headers: Record<string, string> = {};
-  for (const h of req.headers) {
-    if (h.enabled && h.key) headers[h.key] = h.value;
-  }
-  if (req.auth.type === 'bearer' && req.auth.token) {
-    headers['Authorization'] = `Bearer ${req.auth.token}`;
-  }
-  if (req.auth.type === 'api_key' && req.auth.apiKey) {
-    headers['X-API-Key'] = req.auth.apiKey;
-  }
-  if (req.auth.type === 'stellar' && req.auth.stellarPublicKey) {
-    headers['X-Stellar-Public-Key'] = req.auth.stellarPublicKey;
-  }
-  return headers;
-}
 
 type PanelView = 'examples' | 'history';
 
@@ -61,37 +39,72 @@ export const ApiPlayground: React.FC<{ baseUrl?: string }> = ({
     setError(null);
     setResponse(null);
 
-    const startMs = performance.now();
     let res: ApiResponse | null = null;
     let err: string | null = null;
 
     try {
-      const url = buildUrl(baseUrl, request);
-      const headers = buildHeaders(request);
+      const client = createApiClient({ baseUrl });
+
+      // Build query params map
+      const enabledParams = request.queryParams.filter((p) => p.enabled && p.key);
+      const params = Object.fromEntries(enabledParams.map((p) => [p.key, p.value]));
+
+      // Build extra headers
+      const extraHeaders: Record<string, string> = {};
+      for (const h of request.headers) {
+        if (h.enabled && h.key) extraHeaders[h.key] = h.value;
+      }
+
+      // Auth headers
+      if (request.auth.type === 'api_key' && request.auth.apiKey) {
+        extraHeaders['X-API-Key'] = request.auth.apiKey;
+      }
+      if (request.auth.type === 'stellar' && request.auth.stellarPublicKey) {
+        extraHeaders['X-Stellar-Public-Key'] = request.auth.stellarPublicKey;
+      }
+
+      const bearerToken =
+        request.auth.type === 'bearer' ? request.auth.token : undefined;
+
       const hasBody = !['GET', 'DELETE'].includes(request.method) && request.body.trim();
+      const body = hasBody ? (() => { try { return JSON.parse(request.body); } catch { return request.body; } })() : undefined;
 
-      const fetchRes = await fetch(url, {
-        method: request.method,
-        headers,
-        body: hasBody ? request.body : undefined,
-      });
+      const method = request.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-      const durationMs = Math.round(performance.now() - startMs);
-      const body = await fetchRes.text();
-      const responseHeaders: Record<string, string> = {};
-      fetchRes.headers.forEach((v, k) => { responseHeaders[k] = v; });
+      const result = await client[method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete'](
+        request.url,
+        // For methods with body, pass body as second arg; otherwise pass options directly
+        ...(method !== 'GET' && method !== 'DELETE'
+          ? [body, { headers: extraHeaders, params, bearerToken }]
+          : [{ headers: extraHeaders, params, bearerToken }]
+        ) as [unknown, ...unknown[]]
+      );
 
       res = {
-        status: fetchRes.status,
-        statusText: fetchRes.statusText,
-        headers: responseHeaders,
-        body,
-        durationMs,
+        status: result.status,
+        statusText: 'OK',
+        headers: result.headers,
+        body: typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2),
+        durationMs: result.durationMs,
         timestamp: new Date().toISOString(),
       };
       setResponse(res);
     } catch (e) {
-      err = e instanceof Error ? e.message : String(e);
+      if (e instanceof ApiError) {
+        const bodyStr = typeof e.body === 'string' ? e.body : JSON.stringify(e.body, null, 2);
+        err = `${e.status} ${e.statusText}${bodyStr ? `\n${bodyStr}` : ''}`;
+        res = {
+          status: e.status,
+          statusText: e.statusText,
+          headers: {},
+          body: bodyStr ?? '',
+          durationMs: 0,
+          timestamp: new Date().toISOString(),
+        };
+        setResponse(res);
+      } else {
+        err = e instanceof Error ? e.message : String(e);
+      }
       setError(err);
     } finally {
       setLoading(false);
