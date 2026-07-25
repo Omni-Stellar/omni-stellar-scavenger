@@ -3,69 +3,50 @@
  * Manage offline functionality and storage
  */
 
-import { useState, useEffect } from 'react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useAsync } from '../hooks/useAsync';
+import { useResource } from '../hooks/useResource';
 import { getDatabaseSize, clearAllData, getPendingMutations } from '../lib/offline/storage';
 import { syncManager } from '../lib/offline/syncManager';
 import { Download, Trash2, RefreshCw, Database, Wifi } from 'lucide-react';
 
 export function OfflineSettings() {
   const isOnline = useOnlineStatus();
-  const [storageInfo, setStorageInfo] = useState({ bytes: 0, formatted: '0 B' });
-  const [pendingCount, setPendingCount] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
+  const storage = useResource(getDatabaseSize);
+  const pending = useResource(async () => (await getPendingMutations()).length);
 
-  useEffect(() => {
-    loadStorageInfo();
-    loadPendingCount();
-  }, []);
+  const storageInfo = storage.data ?? { bytes: 0, formatted: '0 B' };
+  const pendingCount = pending.data ?? 0;
 
-  const loadStorageInfo = async () => {
-    const info = await getDatabaseSize();
-    setStorageInfo(info);
-  };
-
-  const loadPendingCount = async () => {
-    const mutations = await getPendingMutations();
-    setPendingCount(mutations.length);
-  };
-
-  const handleSync = async () => {
+  const { run: handleSync, isLoading: isSyncing } = useAsync(async () => {
     if (!isOnline) {
       alert('Cannot sync while offline');
       return;
     }
 
-    setIsSyncing(true);
     try {
       const result = await syncManager.syncPendingMutations();
       alert(`Sync complete: ${result.success} succeeded, ${result.failed} failed`);
-      await loadPendingCount();
+      await pending.reload();
     } catch (error) {
       alert('Sync failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      setIsSyncing(false);
     }
-  };
+  });
 
-  const handleClearData = async () => {
+  const { run: handleClearData, isLoading: isClearing } = useAsync(async () => {
     if (!confirm('Are you sure you want to clear all offline data? This action cannot be undone.')) {
       return;
     }
 
-    setIsClearing(true);
     try {
       await clearAllData();
-      await loadStorageInfo();
-      await loadPendingCount();
+      await storage.reload();
+      await pending.reload();
       alert('All offline data cleared successfully');
     } catch (error) {
       alert('Failed to clear data: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      setIsClearing(false);
     }
-  };
+  });
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">

@@ -9,6 +9,7 @@ import { AuthProvider } from '@/context/AuthContext'
 import { WalletProvider } from '@/context/WalletContext'
 import { ContractProvider } from '@/context/ContractContext'
 import { ThemeProvider, useTheme } from '@/context/ThemeProvider'
+import { StoreProvider } from '@/store'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { getErrorMessage } from '@/lib/contractErrors'
 import { initWebVitals } from '@/lib/webVitals'
@@ -107,14 +108,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <ErrorBoundary>
-          <AuthProvider>
-            <WalletProvider>
-              <ContractProvider>
-                <App />
-                <ThemedToaster />
-              </ContractProvider>
-            </WalletProvider>
-          </AuthProvider>
+          <StoreProvider>
+            <AuthProvider>
+              <WalletProvider>
+                <ContractProvider>
+                  <App />
+                  <ThemedToaster />
+                </ContractProvider>
+              </WalletProvider>
+            </AuthProvider>
+          </StoreProvider>
         </ErrorBoundary>
       </ThemeProvider>
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
