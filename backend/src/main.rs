@@ -15,7 +15,7 @@ use services::{
     WebhookManager, ExportService, AuditService, VerificationService, DefaultVerificationService,
     ArchivalService, FileSystemArchivalStorage,
 };
-use middleware::{RateLimitMiddleware, RateLimitConfig, ValidationMiddleware, CsrfMiddleware};
+use middleware::{RateLimitMiddleware, RateLimitConfig, ValidationMiddleware, CsrfMiddleware, RequestIdMiddleware};
 use cache::Cache;
 use api::{contracts, ws, export, audit, verification, compliance_api, signing_api, search as search_api, archival as archival_api};
 use std::sync::Arc;
@@ -132,6 +132,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .wrap(RateLimitMiddleware::new(rate_limit_config.clone()))
             .wrap(ValidationMiddleware)
+            .wrap(RequestIdMiddleware)
             .app_data(web::Data::new(email_service.clone()))
             .app_data(web::Data::new(notification_service.clone()))
             .app_data(web::Data::new(reporting_service.clone()))
