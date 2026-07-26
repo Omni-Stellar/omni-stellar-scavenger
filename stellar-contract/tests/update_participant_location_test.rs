@@ -1,7 +1,11 @@
-use soroban_sdk::{symbol_short, testutils::{Address as _, Events}, Address, Env, IntoVal, TryIntoVal};
+use soroban_sdk::{
+    symbol_short,
+    testutils::{Address as _, Events},
+    Address, Env, IntoVal, TryIntoVal,
+};
 use stellar_scavngr_contract::{ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient};
 
-fn setup(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient, Address) {
+fn setup(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient<'_>, Address) {
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);
     let client = omni-stellar-omni-stellar-scavengerContractClient::new(env, &contract_id);
     let participant = Address::generate(env);

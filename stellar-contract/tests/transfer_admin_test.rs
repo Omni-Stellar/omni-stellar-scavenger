@@ -1,6 +1,10 @@
 #![cfg(test)]
 
-use soroban_sdk::{symbol_short, testutils::{Address as _, Events}, vec, Address, Env, IntoVal};
+use soroban_sdk::{
+    symbol_short,
+    testutils::{Address as _, Events},
+    vec, Address, Env, IntoVal,
+};
 use stellar_scavngr_contract::{omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient};
 
 fn setup(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient<'_>, Address) {

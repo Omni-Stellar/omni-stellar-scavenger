@@ -1,0 +1,66 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: omni-stellar-scavenger-storage
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: omni-stellar-scavenger-data-pv
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: omni-stellar-scavenger-storage
+  awsElasticBlockStore:
+    volumeID: vol-xxxxx
+    fsType: ext4
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: omni-stellar-scavenger-data-pvc
+  namespace: omni-stellar-scavenger
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: omni-stellar-scavenger-storage
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: omni-stellar-scavenger-cache-pvc
+  namespace: omni-stellar-scavenger
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: omni-stellar-scavenger-storage
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: omni-stellar-scavenger-logs-pvc
+  namespace: omni-stellar-scavenger
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: omni-stellar-scavenger-storage
+  resources:
+    requests:
+      storage: 10Gi
