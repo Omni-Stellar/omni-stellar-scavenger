@@ -4,7 +4,7 @@ use stellar_scavngr_contract::{
     ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType,
 };
 
-fn create_test_contract(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient, Address) {
+fn create_test_contract(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient<'_>, Address) {
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);
     let client = omni-stellar-omni-stellar-scavengerContractClient::new(env, &contract_id);
 
@@ -58,11 +58,11 @@ fn test_reset_waste_confirmation() {
     let reset_waste = client.reset_waste_confirmation(&waste_id, &owner);
 
     // Verify confirmation is reset
-    assert_eq!(reset_waste.is_confirmed, false);
+    assert!(!reset_waste.is_confirmed);
 
     // Verify waste can be re-confirmed
     let reconfirmed = client.confirm_waste_details(&waste_id, &confirmer);
-    assert_eq!(reconfirmed.is_confirmed, true);
+    assert!(reconfirmed.is_confirmed);
 }
 
 #[test]
