@@ -6,8 +6,9 @@ mod compliance;
 mod security;
 mod validation;
 mod search;
+mod errors;
 
-use actix_web::{web, App, HttpServer, HttpResponse};
+use actix_web::{web, App, HttpServer, HttpResponse, HttpRequest, ResponseError};
 use actix_cors::Cors;
 use services::{
     EmailService, SendGridEmailService, NotificationService, FirebaseNotificationService,
@@ -18,6 +19,7 @@ use services::{
 use middleware::{RateLimitMiddleware, RateLimitConfig, ValidationMiddleware, CsrfMiddleware, RequestIdMiddleware};
 use cache::Cache;
 use api::{contracts, ws, export, audit, verification, compliance_api, signing_api, search as search_api, archival as archival_api};
+use errors::AppError;
 use std::sync::Arc;
 use tracing::info;
 use tracing_subscriber::{fmt, EnvFilter, prelude::*};
@@ -144,6 +146,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(ws_manager.clone()))
             .app_data(web::Data::new(search_client.clone()))
             .app_data(web::Data::new(archival_service.clone()))
+            .app_data(web::JsonConfig::default().error_handler(json_error_handler))
+            .default_service(web::route().to(not_found))
             // Health
             .route("/health", web::get().to(health_check))
             // Contract Queries (Task 1)
@@ -226,6 +230,23 @@ async fn main() -> std::io::Result<()> {
     .bind("0.0.0.0:8080")?
     .run()
     .await
+}
+
+/// Central fallback for unmatched routes — keeps 404s in the same
+/// unified JSON error envelope as handler-returned `AppError`s.
+async fn not_found(req: HttpRequest) -> HttpResponse {
+    AppError::NotFound {
+        resource: "route",
+        id: req.path().to_string(),
+    }
+    .error_response()
+}
+
+/// Central fallback for malformed JSON request bodies — keeps 400s in
+/// the same unified JSON error envelope instead of actix's plaintext default.
+fn json_error_handler(err: actix_web::error::JsonPayloadError, _req: &HttpRequest) -> actix_web::Error {
+    let response = AppError::BadRequest(err.to_string()).error_response();
+    actix_web::error::InternalError::from_response(err, response).into()
 }
 
 async fn health_check() -> HttpResponse {
