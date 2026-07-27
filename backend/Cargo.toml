@@ -49,6 +49,10 @@ mockall = "0.12"
 tokio-test = "0.4"
 tempfile = "3"
 
+[lib]
+name = "omni-stellar-scavenger_backend"
+path = "src/lib.rs"
+
 [[bin]]
 name = "omni-stellar-scavenger-backend"
 path = "src/main.rs"
