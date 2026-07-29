@@ -12,11 +12,18 @@
 
 use soroban_sdk::{testutils::Address as _, Address, Env, String, Symbol, Vec};
 
-use crate::{omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, ParticipantRole, WasteType};
+use crate::{ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType};
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-fn setup() -> (Env, omni-stellar-omni-stellar-scavengerContractClient<'static>, Address, Address, Address, Address) {
+fn setup() -> (
+    Env,
+    omni-stellar-omni-stellar-scavengerContractClient<'static>,
+    Address,
+    Address,
+    Address,
+    Address,
+) {
     let env = Env::default();
     env.mock_all_auths();
 

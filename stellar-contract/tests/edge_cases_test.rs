@@ -1,9 +1,7 @@
 #![cfg(test)]
 
 use soroban_sdk::{testutils::Address as _, Address, Env, String, Vec};
-use stellar_scavngr_contract::{
-    ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType,
-};
+use stellar_scavngr_contract::{ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType};
 
 fn setup_contract(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient<'_>, Address, Address, Address) {
     env.mock_all_auths();
@@ -388,13 +386,7 @@ fn test_non_creator_deactivate_incentive() {
 
     let other_manufacturer = Address::generate(&env);
     let name = soroban_sdk::symbol_short!("test");
-    client.register_participant(
-        &other_manufacturer,
-        &ParticipantRole::Manufacturer,
-        &name,
-        &0,
-        &0,
-    );
+    client.register_participant(&other_manufacturer, &ParticipantRole::Manufacturer, &name, &0, &0);
 
     let incentive = client.create_incentive(&manufacturer, &WasteType::Plastic, &100, &1000);
 
