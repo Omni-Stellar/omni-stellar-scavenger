@@ -1,9 +1,7 @@
 #![cfg(test)]
 
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env};
-use stellar_scavngr_contract::{
-    ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType,
-};
+use stellar_scavngr_contract::{ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType};
 
 fn setup_contract(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient<'_>, Address) {
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);
@@ -94,13 +92,7 @@ fn test_deactivate_waste_by_admin() {
         &-93_000_000,
     );
 
-    let waste_id = client.recycle_waste(
-        &WasteType::Plastic,
-        &1_500,
-        &collector,
-        &45_000_000,
-        &-93_000_000,
-    );
+    let waste_id = client.recycle_waste(&WasteType::Plastic, &1_500, &collector, &45_000_000, &-93_000_000);
 
     let deactivated = client.deactivate_waste(&waste_id, &admin);
 
