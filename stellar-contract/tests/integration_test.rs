@@ -1,11 +1,9 @@
 #![cfg(test)]
 
-use soroban_sdk::{testutils::Address as _, Address, Env, String, Symbol};
-use stellar_scavngr_contract::{
-    ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
+use stellar_scavngr_contract::{ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType};
 
-fn setup_full_ecosystem(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient, Address, Address, Address, Address) {
+fn setup_full_ecosystem(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient<'_>, Address, Address, Address, Address) {
     env.mock_all_auths();
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);
     let client = omni-stellar-omni-stellar-scavengerContractClient::new(env, &contract_id);
@@ -322,7 +320,7 @@ fn test_global_statistics() {
     let recycler2 = Address::generate(&env);
     client.register_participant(&recycler2, &ParticipantRole::Recycler, &name, &0, &0);
 
-    let desc = String::from_str(&env, "Test");
+    let _desc = String::from_str(&env, "Test");
 
     // Multiple participants submit using new waste system
     client.recycle_waste(&WasteType::Plastic, &1000, &recycler, &0, &0);
@@ -398,7 +396,7 @@ fn test_confirmation_event_sequence() {
 
     // Transfer to collector
     client.transfer_waste_v2(&waste_id, &recycler, &collector, &0, &0);
-    
+
     // Manufacturer confirms (third party)
     client.confirm_waste_details(&waste_id, &manufacturer);
 

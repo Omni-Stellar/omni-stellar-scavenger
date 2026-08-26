@@ -1,0 +1,166 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: omni-stellar-scavenger
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omni-stellar-scavenger-backend
+  namespace: omni-stellar-scavenger
+  labels:
+    app: omni-stellar-scavenger-backend
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: omni-stellar-scavenger-backend
+  template:
+    metadata:
+      labels:
+        app: omni-stellar-scavenger-backend
+        version: v1
+    spec:
+      serviceAccountName: omni-stellar-scavenger
+      containers:
+      - name: backend
+        image: YOUR_ECR_URI/omni-stellar-scavenger-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: omni-stellar-scavenger-secrets
+              key: database-url
+        - name: STELLAR_NETWORK
+          value: "testnet"
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+        - name: logs
+          mountPath: /var/log/omni-stellar-scavenger
+      volumes:
+      - name: config
+        configMap:
+          name: omni-stellar-scavenger-config
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: omni-stellar-scavenger-backend
+  namespace: omni-stellar-scavenger
+  labels:
+    app: omni-stellar-scavenger-backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: omni-stellar-scavenger-backend
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: omni-stellar-scavenger-backend-hpa
+  namespace: omni-stellar-scavenger
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: omni-stellar-scavenger-backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: omni-stellar-scavenger-backend-pdb
+  namespace: omni-stellar-scavenger
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: omni-stellar-scavenger-backend
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: omni-stellar-scavenger-config
+  namespace: omni-stellar-scavenger
+data:
+  config.toml: |
+    [server]
+    host = "0.0.0.0"
+    port = 8080
+    
+    [logging]
+    level = "info"
+    format = "json"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: omni-stellar-scavenger-secrets
+  namespace: omni-stellar-scavenger
+type: Opaque
+stringData:
+  database-url: "postgresql://user:password@postgres:5432/omni-stellar-scavenger"
