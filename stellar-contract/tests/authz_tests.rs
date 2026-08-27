@@ -21,9 +21,7 @@
 #![cfg(test)]
 
 use soroban_sdk::{testutils::Address as _, vec, Address, Env, Vec};
-use stellar_scavngr_contract::{
-    ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType,
-};
+use stellar_scavngr_contract::{ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType};
 
 // ── Shared setup ──────────────────────────────────────────────────────────────
 
@@ -31,14 +29,14 @@ fn setup(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient<'_>, A
     env.mock_all_auths();
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);
     let client = omni-stellar-omni-stellar-scavengerContractClient::new(env, &contract_id);
-    let admin        = Address::generate(env);
-    let recycler     = Address::generate(env);
-    let collector    = Address::generate(env);
+    let admin = Address::generate(env);
+    let recycler = Address::generate(env);
+    let collector = Address::generate(env);
     let manufacturer = Address::generate(env);
-    let name         = soroban_sdk::symbol_short!("test");
+    let name = soroban_sdk::symbol_short!("test");
     client.initialize_admin(&admin);
-    client.register_participant(&recycler,     &ParticipantRole::Recycler,     &name, &0i128, &0i128);
-    client.register_participant(&collector,    &ParticipantRole::Collector,    &name, &0i128, &0i128);
+    client.register_participant(&recycler, &ParticipantRole::Recycler, &name, &0i128, &0i128);
+    client.register_participant(&collector, &ParticipantRole::Collector, &name, &0i128, &0i128);
     client.register_participant(&manufacturer, &ParticipantRole::Manufacturer, &name, &0i128, &0i128);
     (client, admin, recycler, collector, manufacturer)
 }
