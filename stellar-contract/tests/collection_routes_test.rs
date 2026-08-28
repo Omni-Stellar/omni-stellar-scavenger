@@ -2,8 +2,7 @@
 
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Vec};
 use stellar_scavngr_contract::{
-    CollectionRoute, ParticipantRole, RouteStatus, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient,
-    WasteType,
+    CollectionRoute, ParticipantRole, RouteStatus, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType,
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -23,12 +22,7 @@ fn register(client: &omni-stellar-omni-stellar-scavengerContractClient, env: &En
 }
 
 /// Register a waste at the given coordinates (microdegrees).
-fn register_waste(
-    client: &omni-stellar-omni-stellar-scavengerContractClient,
-    recycler: &Address,
-    lat: i128,
-    lon: i128,
-) -> u128 {
+fn register_waste(client: &omni-stellar-omni-stellar-scavengerContractClient, recycler: &Address, lat: i128, lon: i128) -> u128 {
     client.recycle_waste(&WasteType::Plastic, &5_000, recycler, &lat, &lon)
 }
 

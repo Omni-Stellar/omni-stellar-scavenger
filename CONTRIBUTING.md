@@ -13,8 +13,9 @@ Thank you for your interest in contributing to omni-stellar-omni-stellar-scaveng
 5. [Commit Message Conventions](#commit-message-conventions)
 6. [Development Workflow](#development-workflow)
 7. [Review Process](#review-process)
-8. [Contributor Recognition](#contributor-recognition)
-9. [Code of Conduct](#code-of-conduct)
+8. [Module Ownership Map](#module-ownership-map)
+9. [Contributor Recognition](#contributor-recognition)
+10. [Code of Conduct](#code-of-conduct)
 
 ---
 
@@ -548,6 +549,35 @@ All checks must pass before merge.
 - [ ] No breaking changes
 - [ ] Performance impact acceptable
 - [ ] Security concerns addressed
+
+---
+
+## Module Ownership Map
+
+Use this map to route issues, questions, and review requests to the right area of the codebase. Each top-level directory has a designated owner (see [`.github/CODEOWNERS`](.github/CODEOWNERS)) who is automatically requested for review on PRs touching that area.
+
+| Directory | Responsibility | Owner |
+|---|---|---|
+| `stellar-contract/`, `contracts/` | Soroban smart contracts (Rust): waste registration, transfers, rewards, incentives | @Omni-Stellar |
+| `frontend/` | React/TypeScript web app: pages, components, hooks, client-side services | @Omni-Stellar |
+| `backend/` | Rust backend services and APIs | @Omni-Stellar |
+| `indexer/` | Blockchain event indexer (TypeScript) | @Omni-Stellar |
+| `mobile/` | Mobile application | @Omni-Stellar |
+| `packages/` | Shared packages, including `omni-stellar-scavenger-sdk` | @Omni-Stellar |
+| `website/` | Marketing/landing website | @Omni-Stellar |
+| `docs/` | Project documentation | @Omni-Stellar |
+| `scripts/` | Operational and build scripts (deploy, backup, cost, CDN, …) | @Omni-Stellar |
+| `k8s/`, `terraform/`, `config/` | Infrastructure: Kubernetes manifests, Terraform, service configuration | @Omni-Stellar |
+| `.github/`, `docker-compose*.yml` | CI/CD workflows, PR templates, local orchestration | @Omni-Stellar |
+| `integration-tests/`, `performance/`, `security-tests/` | Cross-cutting test suites: integration, performance, security | @Omni-Stellar |
+| `demo/` | Demo assets and example flows | @Omni-Stellar |
+
+### Routing guidelines
+
+- **Filing an issue:** prefix the title with the affected area (e.g. `[Frontend]`, `[Contract]`, `[Indexer]`) so it reaches the right owner.
+- **Opening a PR:** keep changes scoped to one area where possible; CODEOWNERS will request the owner's review automatically.
+- **Cross-cutting changes** (e.g. contract + frontend types): mention every affected owner in the PR description.
+- **Unsure where something belongs?** Open an issue and the global owner (@Omni-Stellar) will triage it.
 
 ---
 
