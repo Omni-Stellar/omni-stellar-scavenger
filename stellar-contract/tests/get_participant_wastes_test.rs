@@ -1,9 +1,7 @@
 #![cfg(test)]
 
 use soroban_sdk::{testutils::Address as _, Address, Env, String, Vec};
-use stellar_scavngr_contract::{
-    ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType,
-};
+use stellar_scavngr_contract::{ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType};
 
 #[test]
 fn test_get_participant_wastes_returns_owned_ids() {

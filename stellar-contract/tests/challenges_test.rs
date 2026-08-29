@@ -22,11 +22,7 @@ fn setup(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient<'_>, A
     (client, admin, recycler)
 }
 
-fn create_default_challenge(
-    client: &omni-stellar-omni-stellar-scavengerContractClient<'_>,
-    admin: &Address,
-    env: &Env,
-) -> u64 {
+fn create_default_challenge(client: &omni-stellar-omni-stellar-scavengerContractClient<'_>, admin: &Address, env: &Env) -> u64 {
     let now = env.ledger().timestamp();
     let c = client.create_challenge(
         admin,

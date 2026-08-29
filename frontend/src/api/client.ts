@@ -451,7 +451,7 @@ export class omni-stellar-omni-stellar-scavengerClient {
   }
 
   async getSupplyChainStats(): Promise<{ total_wastes: bigint; total_weight: bigint; total_tokens: bigint }> {
-    return this.invoke('get_supply_chain_stats', [])
+    return this.invoke<{ total_wastes: bigint; total_weight: bigint; total_tokens: bigint }>('get_supply_chain_stats', [])
   }
 
   // =======================================================

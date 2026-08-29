@@ -1,6 +1,9 @@
 #![cfg(test)]
 
-use soroban_sdk::{testutils::{Address as _, Ledger}, vec, Address, Env};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    vec, Address, Env,
+};
 use stellar_scavngr_contract::{Error, ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType};
 
 fn setup(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient, Address, Address) {
