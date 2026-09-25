@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: omni-stellar-scavenger-postgres-pv
+  namespace: omni-stellar-scavenger
+  labels:
+    app: omni-stellar-scavenger
+    component: postgres
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: standard
+  hostPath:
+    path: /data/omni-stellar-scavenger/postgres
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: omni-stellar-scavenger-postgres-pvc
+  namespace: omni-stellar-scavenger
+  labels:
+    app: omni-stellar-scavenger
+    component: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: omni-stellar-scavenger-prometheus-pv
+  namespace: omni-stellar-scavenger
+  labels:
+    app: omni-stellar-scavenger
+    component: prometheus
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: standard
+  hostPath:
+    path: /data/omni-stellar-scavenger/prometheus
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: omni-stellar-scavenger-prometheus-pvc
+  namespace: omni-stellar-scavenger
+  labels:
+    app: omni-stellar-scavenger
+    component: prometheus
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: omni-stellar-scavenger-grafana-pv
+  namespace: omni-stellar-scavenger
+  labels:
+    app: omni-stellar-scavenger
+    component: grafana
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: standard
+  hostPath:
+    path: /data/omni-stellar-scavenger/grafana
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: omni-stellar-scavenger-grafana-pvc
+  namespace: omni-stellar-scavenger
+  labels:
+    app: omni-stellar-scavenger
+    component: grafana
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: omni-stellar-scavenger-elasticsearch-pv
+  namespace: omni-stellar-scavenger
+  labels:
+    app: omni-stellar-scavenger
+    component: elasticsearch
+spec:
+  capacity:
+    storage: 30Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: standard
+  hostPath:
+    path: /data/omni-stellar-scavenger/elasticsearch
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: omni-stellar-scavenger-elasticsearch-pvc
+  namespace: omni-stellar-scavenger
+  labels:
+    app: omni-stellar-scavenger
+    component: elasticsearch
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Gi
+  storageClassName: standard
