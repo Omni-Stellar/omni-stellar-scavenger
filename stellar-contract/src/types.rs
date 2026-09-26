@@ -1,3 +1,4 @@
+//! Core type definitions for the omni-stellar-omni-stellar-scavenger contract.
 use soroban_sdk::{contracttype, Address, String, Symbol};
 
 /// Represents an incentive offered by a manufacturer to encourage recycling
