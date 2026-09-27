@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { bundleMonitor } from './bundleMonitor';
+import { bundleMonitor } from '../bundleMonitor';
 
 describe('Bundle Monitor', () => {
   beforeEach(() => {
