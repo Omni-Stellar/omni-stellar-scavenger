@@ -238,3 +238,16 @@ Pull requests must pass all CI checks before merging. Configure branch protectio
 ## License
 
 MIT License - see LICENSE file for details
+
+---
+
+## Project Structure Notes
+
+| Directory | Status | Notes |
+|-----------|--------|-------|
+| `frontend/` | ✅ Active | Main web app — built and tested in CI |
+| `backend/` | ✅ Active | Rust backend — built and tested in CI |
+| `stellar-contract/` | ✅ Active | Smart contracts — built and tested in CI |
+| `indexer/` | ✅ Active | Indexer service — built and tested in CI |
+| `packages/` | ✅ Active | Shared TypeScript packages |
+| `mobile/` | ⚠️ **Unmaintained** | Legacy scaffolding — see `mobile/README.md` |
