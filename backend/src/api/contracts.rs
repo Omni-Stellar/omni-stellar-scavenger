@@ -1,10 +1,21 @@
+//! #1086: `invalidate_waste_cache` and `invalidate_all_cache` are the only
+//! write (POST) endpoints in this file — everything else is a read-only
+//! query. Both are already covered by the app-level `IdempotencyMiddleware`
+//! wired in `main.rs` via `.wrap()`, which intercepts every write method on
+//! every route before it reaches a handler, so no additional per-endpoint
+//! wiring belongs here. See `signing_api.rs` for the equivalent note on
+//! transaction-signing endpoints.
+
 use actix_web::{web, HttpRequest, HttpResponse};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
-use crate::cache::Cache;
+use crate::cache::ttl::{keys as cache_keys, CacheTtl};
+use crate::cache::{Cache, CacheInvalidationManager, InvalidationEvent};
+use crate::api::pagination::{paginate, PaginationParams};
 use crate::services::api::{ApiBuilder, PaginatedResponse};
-use crate::validation::{validate_pagination, ValidationError};
+use crate::validation::{error_response, validate_pagination};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WasteResponse {
@@ -70,16 +81,6 @@ fn now() -> String {
     Utc::now().to_rfc3339()
 }
 
-fn error_response(errors: Vec<ValidationError>) -> HttpResponse {
-    HttpResponse::BadRequest().json(ApiBuilder::error_response::<String>(
-        errors
-            .iter()
-            .map(|e| format!("{}: {}", e.field, e.message))
-            .collect::<Vec<_>>()
-            .join("; "),
-    ))
-}
-
 fn query_string(req: &HttpRequest) -> String {
     let qs = req.query_string();
     if qs.is_empty() {
@@ -89,20 +90,45 @@ fn query_string(req: &HttpRequest) -> String {
     }
 }
 
+// ── #1158: Extracted filter helpers ──────────────────────────────────────────
+
+/// #1158: extracted from list_wastes()
+/// Applies all optional query filters to a vec of waste items in-place.
+fn apply_waste_filters(items: &mut Vec<WasteResponse>, query: &WasteQueryParams) {
+    if let Some(ref status) = query.status {
+        items.retain(|w| w.status == *status);
+    }
+    if let Some(ref waste_type) = query.waste_type {
+        items.retain(|w| w.waste_type == *waste_type);
+    }
+    if let Some(ref pid) = query.participant_id {
+        items.retain(|w| w.participant_id == *pid);
+    }
+}
+
+/// #1158: extracted from list_participants()
+/// Applies all optional query filters to a vec of participant items in-place.
+fn apply_participant_filters(items: &mut Vec<ParticipantResponse>, query: &ParticipantQueryParams) {
+    if let Some(ref role) = query.role {
+        items.retain(|p| p.role == *role);
+    }
+    if let Some(ref search) = query.search {
+        items.retain(|p| p.name.to_lowercase().contains(&search.to_lowercase()));
+    }
+}
+
 pub async fn list_wastes(
     req: HttpRequest,
     cache: web::Data<Cache>,
     query: web::Query<WasteQueryParams>,
 ) -> HttpResponse {
-    let page = query.page.unwrap_or(1);
-    let limit = query.limit.unwrap_or(20);
+    let pagination = match PaginationParams::resolve(query.page, query.limit) {
+        Ok(p) => p,
+        Err(errors) => return error_response(&errors),
+    };
+    let (page, limit) = (pagination.page, pagination.limit);
 
-    let errors = validate_pagination(page, limit);
-    if !errors.is_empty() {
-        return error_response(errors);
-    }
-
-    let cache_key = format!("contract:wastes:{}", query_string(&req));
+    let cache_key = cache_keys::waste_list(&query_string(&req));
     if let Some(cached) = cache.get(&cache_key) {
         if let Ok(response) = serde_json::from_slice::<PaginatedResponse<WasteResponse>>(&cached) {
             return HttpResponse::Ok()
@@ -154,28 +180,11 @@ pub async fn list_wastes(
         },
     ];
 
-    if let Some(ref status) = query.status {
-        items.retain(|w| w.status == *status);
-    }
-    if let Some(ref waste_type) = query.waste_type {
-        items.retain(|w| w.waste_type == *waste_type);
-    }
-    if let Some(ref pid) = query.participant_id {
-        items.retain(|w| w.participant_id == *pid);
-    }
+    apply_waste_filters(&mut items, &query);
 
-    let total = items.len() as u32;
-    let start = ((page - 1) * limit) as usize;
-    let end = (start + limit as usize).min(items.len());
-    let page_items = if start < items.len() {
-        items[start..end].to_vec()
-    } else {
-        Vec::new()
-    };
-
-    let response = ApiBuilder::paginated_response(page_items, total, page, limit);
+    let response = paginate(&items, page, limit);
     if let Ok(json) = serde_json::to_vec(&response) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::WasteList.duration());
     }
 
     HttpResponse::Ok()
@@ -183,12 +192,9 @@ pub async fn list_wastes(
         .json(ApiBuilder::success_response(response))
 }
 
-pub async fn get_waste(
-    cache: web::Data<Cache>,
-    path: web::Path<String>,
-) -> HttpResponse {
+pub async fn get_waste(cache: web::Data<Cache>, path: web::Path<String>) -> HttpResponse {
     let waste_id = path.into_inner();
-    let cache_key = format!("contract:waste:{}", waste_id);
+    let cache_key = cache_keys::waste_item(&waste_id);
 
     if let Some(cached) = cache.get(&cache_key) {
         if let Ok(response) = serde_json::from_slice::<WasteResponse>(&cached) {
@@ -210,7 +216,7 @@ pub async fn get_waste(
     };
 
     if let Ok(json) = serde_json::to_vec(&waste) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::WasteItem.duration());
     }
 
     HttpResponse::Ok()
@@ -223,19 +229,15 @@ pub async fn list_participants(
     cache: web::Data<Cache>,
     query: web::Query<ParticipantQueryParams>,
 ) -> HttpResponse {
-    let page = query.page.unwrap_or(1);
-    let limit = query.limit.unwrap_or(20);
+    let pagination = match PaginationParams::resolve(query.page, query.limit) {
+        Ok(p) => p,
+        Err(errors) => return error_response(&errors),
+    };
+    let (page, limit) = (pagination.page, pagination.limit);
 
-    let errors = validate_pagination(page, limit);
-    if !errors.is_empty() {
-        return error_response(errors);
-    }
-
-    let cache_key = format!("contract:participants:{}", query_string(&req));
+    let cache_key = cache_keys::participant_list(&query_string(&req));
     if let Some(cached) = cache.get(&cache_key) {
-        if let Ok(response) =
-            serde_json::from_slice::<PaginatedResponse<ParticipantResponse>>(&cached)
-        {
+        if let Ok(response) = serde_json::from_slice::<PaginatedResponse<ParticipantResponse>>(&cached) {
             return HttpResponse::Ok()
                 .insert_header(("X-Cache", "HIT"))
                 .json(ApiBuilder::success_response(response));
@@ -269,25 +271,11 @@ pub async fn list_participants(
         },
     ];
 
-    if let Some(ref role) = query.role {
-        items.retain(|p| p.role == *role);
-    }
-    if let Some(ref search) = query.search {
-        items.retain(|p| p.name.to_lowercase().contains(&search.to_lowercase()));
-    }
+    apply_participant_filters(&mut items, &query);
 
-    let total = items.len() as u32;
-    let start = ((page - 1) * limit) as usize;
-    let end = (start + limit as usize).min(items.len());
-    let page_items = if start < items.len() {
-        items[start..end].to_vec()
-    } else {
-        Vec::new()
-    };
-
-    let response = ApiBuilder::paginated_response(page_items, total, page, limit);
+    let response = paginate(&items, page, limit);
     if let Ok(json) = serde_json::to_vec(&response) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::ParticipantList.duration());
     }
 
     HttpResponse::Ok()
@@ -295,12 +283,9 @@ pub async fn list_participants(
         .json(ApiBuilder::success_response(response))
 }
 
-pub async fn get_participant(
-    cache: web::Data<Cache>,
-    path: web::Path<String>,
-) -> HttpResponse {
+pub async fn get_participant(cache: web::Data<Cache>, path: web::Path<String>) -> HttpResponse {
     let participant_id = path.into_inner();
-    let cache_key = format!("contract:participant:{}", participant_id);
+    let cache_key = cache_keys::participant_item(&participant_id);
 
     if let Some(cached) = cache.get(&cache_key) {
         if let Ok(response) = serde_json::from_slice::<ParticipantResponse>(&cached) {
@@ -320,7 +305,7 @@ pub async fn get_participant(
     };
 
     if let Ok(json) = serde_json::to_vec(&participant) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::ParticipantItem.duration());
     }
 
     HttpResponse::Ok()
@@ -329,7 +314,7 @@ pub async fn get_participant(
 }
 
 pub async fn get_contract_stats(cache: web::Data<Cache>) -> HttpResponse {
-    let cache_key = "contract:stats".to_string();
+    let cache_key = cache_keys::CONTRACT_STATS.to_string();
 
     if let Some(cached) = cache.get(&cache_key) {
         if let Ok(response) = serde_json::from_slice::<ContractStatsResponse>(&cached) {
@@ -349,7 +334,7 @@ pub async fn get_contract_stats(cache: web::Data<Cache>) -> HttpResponse {
     };
 
     if let Ok(json) = serde_json::to_vec(&stats) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::ContractStats.duration());
     }
 
     HttpResponse::Ok()
@@ -358,7 +343,7 @@ pub async fn get_contract_stats(cache: web::Data<Cache>) -> HttpResponse {
 }
 
 pub async fn get_contract_info(cache: web::Data<Cache>) -> HttpResponse {
-    let cache_key = "contract:info".to_string();
+    let cache_key = cache_keys::CONTRACT_INFO.to_string();
 
     if let Some(cached) = cache.get(&cache_key) {
         if let Ok(response) = serde_json::from_slice::<ContractInfoResponse>(&cached) {
@@ -377,7 +362,7 @@ pub async fn get_contract_info(cache: web::Data<Cache>) -> HttpResponse {
     };
 
     if let Ok(json) = serde_json::to_vec(&info) {
-        cache.set(cache_key, json);
+        cache.set_with_ttl(cache_key, json, CacheTtl::ContractInfo.duration());
     }
 
     HttpResponse::Ok()
@@ -385,24 +370,70 @@ pub async fn get_contract_info(cache: web::Data<Cache>) -> HttpResponse {
         .json(ApiBuilder::success_response(info))
 }
 
+/// Invalidate the cache for a specific waste record and all related list pages.
+/// Also fires an [`InvalidationEvent::WasteUpdated`] through the invalidation manager.
 pub async fn invalidate_waste_cache(
     cache: web::Data<Cache>,
+    invalidation: web::Data<Arc<CacheInvalidationManager>>,
     path: web::Path<String>,
 ) -> HttpResponse {
     let waste_id = path.into_inner();
-    cache.invalidate(&format!("contract:waste:{}", waste_id));
-    HttpResponse::Ok().json(ApiBuilder::success_response("cache invalidated"))
+    let event = InvalidationEvent::WasteUpdated(waste_id.clone());
+    let strategies = invalidation.generate_invalidation_strategy(&event, &cache);
+    for strategy in &strategies {
+        invalidation.apply_strategy(strategy, &cache);
+    }
+    // Always invalidate the exact item key too
+    cache.invalidate(&cache_keys::waste_item(&waste_id));
+    // Invalidate all list pages containing waste
+    cache.invalidate_pattern(cache_keys::WASTE_PATTERN);
+
+    HttpResponse::Ok().json(ApiBuilder::success_response(serde_json::json!({
+        "invalidated": waste_id,
+        "strategies_applied": strategies.len(),
+    })))
 }
 
-pub async fn invalidate_all_cache(cache: web::Data<Cache>) -> HttpResponse {
+/// Invalidate the entire cache (all contract keys).
+pub async fn invalidate_all_cache(
+    cache: web::Data<Cache>,
+    invalidation: web::Data<Arc<CacheInvalidationManager>>,
+) -> HttpResponse {
+    let event = InvalidationEvent::GlobalInvalidation;
+    let strategies = invalidation.generate_invalidation_strategy(&event, &cache);
+    for strategy in &strategies {
+        invalidation.apply_strategy(strategy, &cache);
+    }
+    // Fallback: wipe everything not caught by pattern
     cache.clear();
-    HttpResponse::Ok().json(ApiBuilder::success_response("all cache invalidated"))
+
+    HttpResponse::Ok().json(ApiBuilder::success_response(serde_json::json!({
+        "invalidated": "all",
+        "strategies_applied": strategies.len(),
+    })))
+}
+
+/// Return cache metrics for observability.
+pub async fn cache_metrics(cache: web::Data<Cache>) -> HttpResponse {
+    let metrics = cache.get_metrics();
+    HttpResponse::Ok().json(ApiBuilder::success_response(serde_json::json!({
+        "hits": metrics.hits,
+        "misses": metrics.misses,
+        "evictions": metrics.evictions,
+        "total_requests": metrics.total_requests,
+        "hit_rate": metrics.hit_rate(),
+        "cache_size": cache.len(),
+    })))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use actix_web::test;
+
+    fn make_invalidation() -> web::Data<Arc<CacheInvalidationManager>> {
+        web::Data::new(Arc::new(CacheInvalidationManager::new()))
+    }
 
     #[actix_web::test]
     async fn test_list_wastes_default_pagination() {
@@ -474,18 +505,196 @@ mod tests {
         let cache = Cache::new(60);
         let resp1 = get_contract_stats(web::Data::new(cache.clone())).await;
         assert_eq!(
-            resp1.headers()
-                .get("X-Cache")
-                .and_then(|v| v.to_str().ok()),
+            resp1.headers().get("X-Cache").and_then(|v| v.to_str().ok()),
             Some("MISS")
         );
 
         let resp2 = get_contract_stats(web::Data::new(cache)).await;
         assert_eq!(
-            resp2.headers()
-                .get("X-Cache")
-                .and_then(|v| v.to_str().ok()),
+            resp2.headers().get("X-Cache").and_then(|v| v.to_str().ok()),
             Some("HIT")
         );
+    }
+
+    #[actix_web::test]
+    async fn test_invalidate_waste_cache() {
+        let cache = Cache::new(60);
+        let inv = make_invalidation();
+
+        // Prime the cache
+        let _ = get_waste(web::Data::new(cache.clone()), web::Path::from("w1".to_string())).await;
+        assert!(cache.get(&cache_keys::waste_item("w1")).is_some());
+
+        // Invalidate
+        let resp = invalidate_waste_cache(web::Data::new(cache.clone()), inv, web::Path::from("w1".to_string())).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::OK);
+        assert!(cache.get(&cache_keys::waste_item("w1")).is_none());
+    }
+
+    #[actix_web::test]
+    async fn test_invalidate_all_cache() {
+        let cache = Cache::new(60);
+        let inv = make_invalidation();
+        cache.set("contract:stats".to_string(), b"test".to_vec());
+        let resp = invalidate_all_cache(web::Data::new(cache.clone()), inv).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::OK);
+        assert!(cache.get("contract:stats").is_none());
+    }
+
+    #[actix_web::test]
+    async fn test_cache_metrics_endpoint() {
+        let cache = Cache::new(60);
+        let _ = get_contract_stats(web::Data::new(cache.clone())).await;
+        let _ = get_contract_stats(web::Data::new(cache.clone())).await;
+        let resp = cache_metrics(web::Data::new(cache)).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::OK);
+    }
+
+    #[test]
+    fn test_per_endpoint_ttl_differences() {
+        assert!(
+            CacheTtl::WasteItem.duration() < CacheTtl::ContractStats.duration(),
+            "Waste items should expire faster than aggregate stats"
+        );
+        assert!(
+            CacheTtl::ContractStats.duration() < CacheTtl::ContractInfo.duration(),
+            "Stats should expire faster than near-static contract info"
+        );
+    }
+
+    // ── #1158: apply_waste_filters unit tests ─────────────────────────────
+
+    fn sample_wastes() -> Vec<WasteResponse> {
+        vec![
+            WasteResponse {
+                id: "w1".to_string(),
+                waste_type: "plastic".to_string(),
+                weight: 100,
+                status: "pending".to_string(),
+                location: None,
+                participant_id: "p1".to_string(),
+                created_at: now(),
+                updated_at: now(),
+            },
+            WasteResponse {
+                id: "w2".to_string(),
+                waste_type: "metal".to_string(),
+                weight: 200,
+                status: "approved".to_string(),
+                location: None,
+                participant_id: "p2".to_string(),
+                created_at: now(),
+                updated_at: now(),
+            },
+            WasteResponse {
+                id: "w3".to_string(),
+                waste_type: "plastic".to_string(),
+                weight: 50,
+                status: "approved".to_string(),
+                location: None,
+                participant_id: "p1".to_string(),
+                created_at: now(),
+                updated_at: now(),
+            },
+        ]
+    }
+
+    #[test]
+    fn test_apply_waste_filters_no_filter_returns_all() {
+        let mut items = sample_wastes();
+        let q = WasteQueryParams { page: None, limit: None, status: None, waste_type: None, participant_id: None, sort_by: None, sort_order: None };
+        apply_waste_filters(&mut items, &q);
+        assert_eq!(items.len(), 3);
+    }
+
+    #[test]
+    fn test_apply_waste_filters_by_status() {
+        let mut items = sample_wastes();
+        let q = WasteQueryParams { page: None, limit: None, status: Some("approved".to_string()), waste_type: None, participant_id: None, sort_by: None, sort_order: None };
+        apply_waste_filters(&mut items, &q);
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|w| w.status == "approved"));
+    }
+
+    #[test]
+    fn test_apply_waste_filters_by_waste_type() {
+        let mut items = sample_wastes();
+        let q = WasteQueryParams { page: None, limit: None, status: None, waste_type: Some("plastic".to_string()), participant_id: None, sort_by: None, sort_order: None };
+        apply_waste_filters(&mut items, &q);
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|w| w.waste_type == "plastic"));
+    }
+
+    #[test]
+    fn test_apply_waste_filters_by_participant_id() {
+        let mut items = sample_wastes();
+        let q = WasteQueryParams { page: None, limit: None, status: None, waste_type: None, participant_id: Some("p1".to_string()), sort_by: None, sort_order: None };
+        apply_waste_filters(&mut items, &q);
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|w| w.participant_id == "p1"));
+    }
+
+    #[test]
+    fn test_apply_waste_filters_combined() {
+        let mut items = sample_wastes();
+        let q = WasteQueryParams { page: None, limit: None, status: Some("approved".to_string()), waste_type: Some("plastic".to_string()), participant_id: None, sort_by: None, sort_order: None };
+        apply_waste_filters(&mut items, &q);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, "w3");
+    }
+
+    #[test]
+    fn test_apply_waste_filters_no_match_returns_empty() {
+        let mut items = sample_wastes();
+        let q = WasteQueryParams { page: None, limit: None, status: Some("nonexistent".to_string()), waste_type: None, participant_id: None, sort_by: None, sort_order: None };
+        apply_waste_filters(&mut items, &q);
+        assert!(items.is_empty());
+    }
+
+    // ── #1158: apply_participant_filters unit tests ───────────────────────
+
+    fn sample_participants() -> Vec<ParticipantResponse> {
+        vec![
+            ParticipantResponse { id: "p1".to_string(), name: "Green Recycling Co".to_string(), role: "collector".to_string(), location: None, reputation: 80, joined_at: now() },
+            ParticipantResponse { id: "p2".to_string(), name: "Eco Waste Mgmt".to_string(), role: "processor".to_string(), location: None, reputation: 90, joined_at: now() },
+            ParticipantResponse { id: "p3".to_string(), name: "Blue Recycling".to_string(), role: "collector".to_string(), location: None, reputation: 70, joined_at: now() },
+        ]
+    }
+
+    #[test]
+    fn test_apply_participant_filters_no_filter_returns_all() {
+        let mut items = sample_participants();
+        let q = ParticipantQueryParams { page: None, limit: None, role: None, search: None };
+        apply_participant_filters(&mut items, &q);
+        assert_eq!(items.len(), 3);
+    }
+
+    #[test]
+    fn test_apply_participant_filters_by_role() {
+        let mut items = sample_participants();
+        let q = ParticipantQueryParams { page: None, limit: None, role: Some("collector".to_string()), search: None };
+        apply_participant_filters(&mut items, &q);
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|p| p.role == "collector"));
+    }
+
+    #[test]
+    fn test_apply_participant_filters_by_search_case_insensitive() {
+        let mut items = sample_participants();
+        let q = ParticipantQueryParams { page: None, limit: None, role: None, search: Some("recycling".to_string()) };
+        apply_participant_filters(&mut items, &q);
+        assert_eq!(items.len(), 2);
+        let names: Vec<_> = items.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"Green Recycling Co"));
+        assert!(names.contains(&"Blue Recycling"));
+    }
+
+    #[test]
+    fn test_apply_participant_filters_combined() {
+        let mut items = sample_participants();
+        let q = ParticipantQueryParams { page: None, limit: None, role: Some("collector".to_string()), search: Some("green".to_string()) };
+        apply_participant_filters(&mut items, &q);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, "p1");
     }
 }

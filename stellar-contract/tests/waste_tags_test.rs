@@ -1,7 +1,5 @@
 use soroban_sdk::{testutils::Address as _, Address, Env, String, Symbol};
-use stellar_scavngr_contract::{
-    ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType,
-};
+use stellar_scavngr_contract::{ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType};
 
 fn setup() -> (Env, omni-stellar-omni-stellar-scavengerContractClient<'static>, Address) {
     let env = Env::default();

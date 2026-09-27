@@ -1,9 +1,7 @@
 #![cfg(test)]
 
 use soroban_sdk::{testutils::Address as _, Address, Env};
-use stellar_scavngr_contract::{
-    Error, ParticipantRole, PermissionType, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient,
-};
+use stellar_scavngr_contract::{Error, ParticipantRole, PermissionType, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient};
 
 fn setup(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient, Address) {
     let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);

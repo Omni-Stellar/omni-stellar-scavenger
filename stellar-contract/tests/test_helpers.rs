@@ -22,11 +22,13 @@ pub fn setup_full(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClie
 /// Register N recyclers and return their addresses
 pub fn create_recyclers(env: &Env, client: &omni-stellar-omni-stellar-scavengerContractClient<'_>, n: u32) -> std::vec::Vec<Address> {
     let name = soroban_sdk::symbol_short!("test");
-    (0..n).map(|_| {
-        let addr = Address::generate(env);
-        client.register_participant(&addr, &ParticipantRole::Recycler, &name, &0, &0);
-        addr
-    }).collect()
+    (0..n)
+        .map(|_| {
+            let addr = Address::generate(env);
+            client.register_participant(&addr, &ParticipantRole::Recycler, &name, &0, &0);
+            addr
+        })
+        .collect()
 }
 
 /// Submit waste via recycle_waste and return waste_id
@@ -37,10 +39,20 @@ pub fn submit_waste(client: &omni-stellar-omni-stellar-scavengerContractClient<'
 /// Assert a waste's submitter matches expected address
 pub fn assert_waste_owner(client: &omni-stellar-omni-stellar-scavengerContractClient<'_>, waste_id: u64, expected_owner: &Address) {
     let waste = client.get_waste(&waste_id).expect("waste not found");
-    assert_eq!(&waste.submitter, expected_owner, "Waste {} submitter mismatch", waste_id);
+    assert_eq!(
+        &waste.submitter, expected_owner,
+        "Waste {} submitter mismatch",
+        waste_id
+    );
 }
 
 /// Create an incentive and return its id
-pub fn create_test_incentive(client: &omni-stellar-omni-stellar-scavengerContractClient<'_>, manufacturer: &Address, waste_type: WasteType, reward: u64, budget: u64) -> u64 {
+pub fn create_test_incentive(
+    client: &omni-stellar-omni-stellar-scavengerContractClient<'_>,
+    manufacturer: &Address,
+    waste_type: WasteType,
+    reward: u64,
+    budget: u64,
+) -> u64 {
     client.create_incentive(manufacturer, &waste_type, &reward, &budget).id
 }
