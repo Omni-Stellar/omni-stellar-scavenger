@@ -23,31 +23,37 @@ vi.mock('@/hooks/useAppTitle', () => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: vi.fn((options) => {
-    if (options.queryKey[0] === 'all-materials') {
+    if (options.queryKey[0] === 'dashboard-materials') {
       return {
         data: [
           {
-            material_id: 1,
+            id: 1,
             waste_type: WasteType.Paper,
             weight: 500n,
             submitted_at: Math.floor(Date.now() / 1000),
-            status: 'pending',
+            submitter: 'GABC123',
+            current_owner: 'GABC123',
+            verified: false,
             quality_grade: null,
           },
           {
-            material_id: 2,
+            id: 2,
             waste_type: WasteType.Plastic,
             weight: 250n,
             submitted_at: Math.floor(Date.now() / 1000),
-            status: 'verified',
+            submitter: 'GABC123',
+            current_owner: 'GABC123',
+            verified: true,
             quality_grade: 'A',
           },
           {
-            material_id: 3,
+            id: 3,
             waste_type: WasteType.Metal,
             weight: 1000n,
             submitted_at: Math.floor(Date.now() / 1000),
-            status: 'pending',
+            submitter: 'GABC123',
+            current_owner: 'GABC123',
+            verified: false,
             quality_grade: null,
           },
         ],
