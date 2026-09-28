@@ -659,3 +659,7 @@ For the full text, visit [Contributor Covenant](https://www.contributor-covenant
 - Contact maintainers
 
 Thank you for contributing to omni-stellar-omni-stellar-scavenger! 🚀
+
+## Local Setup
+
+See [docs/getting-started.md](docs/getting-started.md).
