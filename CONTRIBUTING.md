@@ -659,3 +659,42 @@ For the full text, visit [Contributor Covenant](https://www.contributor-covenant
 - Contact maintainers
 
 Thank you for contributing to omni-stellar-omni-stellar-scavenger! 🚀
+
+---
+
+## Test File Location Convention
+
+All tests in this repository follow a **co-located `__tests__/` directory** convention.
+
+### Rule
+
+A test file for `src/foo/bar.ts` must live at `src/foo/__tests__/bar.test.ts`.
+
+**Examples:**
+
+| Source file | Test file |
+|-------------|-----------|
+| `frontend/src/lib/format.ts` | `frontend/src/lib/__tests__/format.test.ts` |
+| `frontend/src/hooks/useAuth.ts` | `frontend/src/hooks/__tests__/useAuth.test.ts` |
+| `frontend/src/components/ui/Button.tsx` | `frontend/src/components/ui/__tests__/Button.test.tsx` |
+| `frontend/src/pages/HomePage.tsx` | `frontend/src/pages/__tests__/HomePage.test.tsx` |
+
+### Do NOT
+
+- ❌ Place test files as siblings of source files (e.g. `lib/format.test.ts`)
+- ❌ Create top-level `tests/` folders inside application packages
+- ❌ Create repo-root `__tests__/` folders for package-specific tests
+
+### Exceptions
+
+The following directories are intentionally separate and are **not** part of this convention:
+
+- `frontend/e2e/` — Playwright end-to-end tests
+- `indexer/tests/` — indexer package test suite
+- `backend/tests/` — backend Rust test suite
+- `stellar-contract/tests/` — smart contract test suite
+- `integration-tests/`, `security-tests/` — cross-cutting test suites
+
+### Enforcement
+
+Vitest runs all `**/__tests__/**/*.test.{ts,tsx}` and `**/*.test.{ts,tsx}` files by default. New contributions should follow the co-located convention above.
