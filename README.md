@@ -20,6 +20,7 @@ A decentralized recycling platform built on Stellar blockchain using Soroban sma
 | [Troubleshooting Guide](docs/TROUBLESHOOTING_GUIDE.md) | Common errors, debugging tips, and performance tuning |
 | [User Guide](docs/USER_GUIDE.md) | End-user guide for the platform |
 | [Security Audit](docs/SECURITY_AUDIT.md) | Security audit findings and mitigations |
+| [ADR: Multi-Service Architecture](docs/adr/0001-multi-service-architecture.md) | Why the repo is split into five services |
 
 ## Project Structure
 
