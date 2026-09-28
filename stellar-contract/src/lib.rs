@@ -1,4 +1,5 @@
 #![no_std]
+//! omni-stellar-omni-stellar-scavenger Stellar Contract - main contract entry point.
 
 // ── Core contract modules ─────────────────────────────────────────────────────
 // #921: errors is the single shared error module — exported publicly so that
@@ -7,6 +8,7 @@
 pub mod errors;
 mod events;
 mod types;
+pub mod types_domains;
 mod validation;
 mod verification;
 mod upgrade;
@@ -62,13 +64,21 @@ pub mod batch_optimizer;
 /// Establishes baseline metrics and detects performance degradation over time.
 pub mod benchmark_regression;
 
+// ── Issue #1272: Storage key audit and collision detection ──────────
+/// Audited storage key constructors with naming convention enforcement.
+/// Verifies uniqueness across all storage key builders.
+pub mod storage_keys;
+
+// ── Issue #1273: Consolidated grading logic ──
+/// Single source of truth for all grading-related logic.
+pub mod grading;
+
 // ── Issues #814–#817: new utility modules ────────────────────────────────────
-/// #814 — Reusable event builder pattern, filtering, and formatting utilities.
-pub mod event_builder;
 /// #815 — Type size analysis, packed flags, coordinate compression, and validation.
 pub mod type_utils;
 /// #816 — Hash-based commitment scheme for privacy-preserving (ZKP-style) operations.
 pub mod zkp;
+pub mod zkp_verifier;
 /// #817 — Versioned cryptographic key storage and rotation.
 pub mod key_rotation;
 
@@ -240,48 +250,15 @@ const MILESTONE_THRESHOLDS: [u128; 7] = [
     100_000_000,
 ];
 
-/// Actions that require multi-sig approval.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum AdminAction {
-    TransferAdmin(Vec<Address>),
-    SetPercentages(u32, u32),
-    DeactivateWaste(u128),
-}
-
-/// A pending multi-sig proposal.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AdminProposal {
-    pub id: u64,
-    pub action: AdminAction,
-    pub proposer: Address,
-    pub approvers: Vec<Address>,
-    pub executed: bool,
-    pub created_at: u64,
-}
+// #1085: AdminAction, AdminProposal, and RewardConfig previously lived here
+// inline; their definitions now live in `admin.rs` (the module boundary for
+// admin/multisig/reward-config concerns) and are re-exported below so the
+// public path `crate::{AdminAction, AdminProposal, RewardConfig}` — and thus
+// the contract ABI — is unchanged.
+pub use crate::admin::{AdminAction, AdminProposal, RewardConfig};
 
 /// Maximum allowed waste weight per submission (1 000 000 kg in grams).
 const MAX_WASTE_WEIGHT: u128 = 1_000_000_000;
-
-/// Reward distribution percentages stored as a single instance-storage entry.
-///
-/// Consolidating `collector_percentage` and `owner_percentage` into one struct
-/// means a single `storage.get` call fetches both values, halving the number
-/// of instance-storage lookups on every `_reward_tokens` invocation.
-///
-/// Migration note: contracts deployed with the old two-key layout
-/// (`COL_PCT` / `OWN_PCT`) should call `set_percentages` once after upgrade
-/// to write the new `RWD_CFG` key; the old keys are then unused and will
-/// expire with the instance TTL.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RewardConfig {
-    /// Percentage of total reward distributed to each collector in the transfer chain.
-    pub collector_percentage: u32,
-    /// Percentage of total reward distributed to the current waste owner.
-    pub owner_percentage: u32,
-}
 
 /// On-chain record for a registered supply-chain participant.
 ///
@@ -554,6 +531,44 @@ impl omni-stellar-omni-stellar-scavengerContract {
         }
     }
 
+    /// Resource-cost optimization (see BENCHMARK_RESULTS.md "Storage read
+    /// caching"): same checks as `require_registered`, but returns the
+    /// fetched `Participant` so callers that also need the record (e.g. for
+    /// a role check) can reuse this single storage read instead of issuing
+    /// a second one.
+    fn require_registered_participant(env: &Env, address: &Address) -> Participant {
+        let key = (address.clone(),);
+        let participant: Option<Participant> = env.storage().instance().get(&key);
+
+        match participant {
+            Some(p) if p.is_registered => p,
+            Some(_) => panic!("Participant is not registered"),
+            None => panic!("Participant not found"),
+        }
+    }
+
+    /// Shared role-transition rule used by both `is_valid_transfer` (which
+    /// fetches its own participants) and `transfer_waste` (which reuses
+    /// participants it already fetched via `require_registered_participant`,
+    /// avoiding a redundant storage read for the same records).
+    fn role_transition_allowed(from_p: &Participant, to_p: &Participant) -> bool {
+        if !from_p.is_registered || !to_p.is_registered {
+            return false;
+        }
+
+        // Invalid if transferring to the same role
+        if from_p.role == to_p.role {
+            return false;
+        }
+
+        matches!(
+            (from_p.role, to_p.role),
+            (ParticipantRole::Recycler, ParticipantRole::Collector)
+                | (ParticipantRole::Recycler, ParticipantRole::Manufacturer)
+                | (ParticipantRole::Collector, ParticipantRole::Manufacturer)
+        )
+    }
+
     /// Verify that the caller is the contract administrator
     /// Panics with "Caller is not the contract admin" if not admin
     /// Panics with "Contract admin has not been set" if admin not configured
@@ -569,6 +584,16 @@ impl omni-stellar-omni-stellar-scavengerContract {
         if !admins.contains(caller) {
             panic!("Caller is not the contract admin");
         }
+    }
+
+    /// Check if the given address is a contract administrator
+    fn is_admin(env: &Env, caller: &Address) -> bool {
+        let admins: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&ADMINS)
+            .unwrap_or(Vec::new(&env));
+        admins.contains(caller)
     }
 
     /// Verify that the caller owns the specified waste item
@@ -1284,21 +1309,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
             return false;
         };
 
-        if !from_p.is_registered || !to_p.is_registered {
-            return false;
-        }
-
-        // Invalid if transferring to the same role
-        if from_p.role == to_p.role {
-            return false;
-        }
-
-        matches!(
-            (from_p.role, to_p.role),
-            (ParticipantRole::Recycler, ParticipantRole::Collector)
-                | (ParticipantRole::Recycler, ParticipantRole::Manufacturer)
-                | (ParticipantRole::Collector, ParticipantRole::Manufacturer)
-        )
+        Self::role_transition_allowed(&from_p, &to_p)
     }
 
     /// Standalone public function to validate a transfer path for a specific waste item.
@@ -1423,7 +1434,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     }
 
     /// Get the total count of waste records
-    fn get_waste_count(env: &Env) -> u64 {
+    pub(crate) fn get_waste_count(env: &Env) -> u64 {
         env.storage().instance().get(&("waste_count",)).unwrap_or(0)
     }
 
@@ -1656,21 +1667,14 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// - `incentive_id`: ID of the incentive to use.
     /// - `waste_amount`: Waste weight in grams.
     ///
-    /// # Returns
-    /// Token reward amount (`u64`). Returns `0` for inactive incentives.
-    ///
-    /// # Errors
-    /// - Panics `"Incentive not found"`.
-    pub fn calculate_incentive_reward(
-        env: Env,
-        incentive_id: u64,
-        waste_amount: u64,
-    ) -> u64 {
-        let incentive: Incentive = Self::get_incentive_internal(&env, incentive_id)
-            .expect("Incentive not found");
-    pub fn calculate_incentive_reward(env: Env, incentive_id: u64, waste_amount: u64) -> u64 {
-        let incentive: Incentive =
-            Self::get_incentive_internal(&env, incentive_id).expect("Incentive not found");
+/// # Returns
+/// Token reward amount (`u64`). Returns `0` for inactive incentives.
+///
+/// # Errors
+/// - Panics `"Incentive not found"`.
+pub fn calculate_incentive_reward(env: Env, incentive_id: u64, waste_amount: u64) -> u64 {
+    let incentive: Incentive =
+        Self::get_incentive_internal(&env, incentive_id).expect("Incentive not found");
 
         // Check if incentive is active
         if !incentive.active {
@@ -1959,11 +1963,18 @@ impl omni-stellar-omni-stellar-scavengerContract {
     ///
     /// # Errors
     /// - Panics if auction not found or not ended
+    /// - Panics if caller is not the auction creator or an admin.
     pub fn end_auction(env: Env, auction_id: u64) {
         Self::require_not_paused(&env);
 
         let key = ("auction", auction_id);
         let mut auction: Auction = env.storage().instance().get(&key).expect("Auction not found");
+
+        // Authorization check: creator or admin can end the auction
+        let caller = env.current_caller();
+        if caller != auction.creator && !Self::is_admin(&env, &caller) {
+            panic!("Only auction creator or admin can end the auction");
+        }
 
         if !auction.is_active || !auction.is_ended(env.ledger().timestamp()) {
             panic!("Auction not ended");
@@ -2343,8 +2354,15 @@ impl omni-stellar-omni-stellar-scavengerContract {
         from.require_auth();
 
         Self::require_not_paused(&env);
-        Self::require_registered(&env, &from);
-        Self::require_registered(&env, &to);
+
+        // Resource-cost optimization (BENCHMARK_RESULTS.md "Storage read
+        // caching"): fetch each participant record once and reuse it for
+        // both the registration check and the role-transition check below,
+        // instead of the previous 4 separate storage reads (2 via
+        // `require_registered` + 2 more inside `is_valid_transfer`) for the
+        // same two records.
+        let from_participant = Self::require_registered_participant(&env, &from);
+        let to_participant = Self::require_registered_participant(&env, &to);
 
         let mut material: Material =
             Self::get_waste_internal(&env, waste_id).expect("Waste not found");
@@ -2355,14 +2373,18 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
         Self::require_addresses_different(&from, &to);
 
-        // Align with v2: reject transfers on deactivated waste
-        // Note: Material doesn't have is_active, assuming active for deprecated function
+        // INTENTIONALLY DISABLED (#1152): The v1 `Material` struct does not carry
+        // an `is_active` field (that field lives on the v2 `Waste` struct only).
+        // This guard cannot be enabled without a storage migration. Callers should
+        // migrate to `transfer_waste_v2`, which performs this check on `Waste`.
+        //
         // if !material.is_active {
         //     panic!("Cannot transfer deactivated waste");
         // }
 
-        // Align with v2: enforce valid transfer routes
-        if !Self::is_valid_transfer(&env, from.clone(), to.clone()) {
+        // Align with v2: enforce valid transfer routes (reuses the
+        // already-fetched participant records — no extra storage reads).
+        if !Self::role_transition_allowed(&from_participant, &to_participant) {
             panic!("Invalid transfer: role combination not allowed");
         }
 
@@ -2456,7 +2478,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         Self::require_not_paused(&env);
         Self::only_registered(&env, &submitter);
 
-        validation::validate_weight(weight as u128, MAX_WASTE_WEIGHT);
+        validation::validate_weight_max(weight as u128, MAX_WASTE_WEIGHT);
         let min_weight = Self::get_min_weight(env.clone());
         if (weight as u128) < min_weight {
             panic!("Waste weight below minimum allowed");
@@ -2534,7 +2556,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         Self::require_not_paused(&env);
         Self::only_registered(&env, &recycler);
 
-        validation::validate_weight(weight, MAX_WASTE_WEIGHT);
+        validation::validate_weight_max(weight, MAX_WASTE_WEIGHT);
         let min_weight = Self::get_min_weight(env.clone());
         if weight < min_weight {
             panic!("Waste weight below minimum allowed");
@@ -3428,7 +3450,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
         // Process each material
         for item in materials.iter() {
             let (waste_type, weight, description) = item;
-            validation::validate_weight(weight as u128, MAX_WASTE_WEIGHT);
+            validation::validate_weight_max(weight as u128, MAX_WASTE_WEIGHT);
             let waste_id = Self::next_waste_id(&env);
 
             let material = Material::new(
@@ -3945,11 +3967,15 @@ impl omni-stellar-omni-stellar-scavengerContract {
         }
         let total_price = total_price_u128 as i128;
 
-        // Pay seller in tokens
-        let token_client = token::Client::new(&env, &token_address);
-        token_client.transfer(&buyer, &listing.seller, &total_price);
+        // ── Checks-effects-interactions (issue: reentrancy audit) ───────────
+        // All state mutations below happen BEFORE the external token
+        // transfer so that a malicious/misbehaving token contract cannot
+        // reenter this function (or any other) and observe or exploit a
+        // half-updated listing/stats state. Previously the token transfer
+        // was issued first, which would have let a reentrant callee see
+        // `listing.is_active == true` and purchase the same listing twice.
 
-        // Credit buyer's carbon credits
+        // Credit buyer's carbon credits (effect)
         let mut buyer_stats: RecyclingStats = env
             .storage()
             .instance()
@@ -3969,6 +3995,11 @@ impl omni-stellar-omni-stellar-scavengerContract {
             .set(&("carb_list", listing_id), &listing);
 
         Self::remove_active_listing(&env, listing_id);
+
+        // Pay seller in tokens (interaction — external cross-contract call,
+        // performed last, after all state above is already committed)
+        let token_client = token::Client::new(&env, &token_address);
+        token_client.transfer(&buyer, &listing.seller, &total_price);
 
         events::emit_carbon_listing_purchased(
             &env,
@@ -4551,28 +4582,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
             .instance()
             .set(&("waste_v2", waste_id), &waste);
 
-        let history_key = ("grade_history", waste_id);
-        let mut history: Vec<types::GradeRecord> = env
-            .storage()
-            .instance()
-            .get(&history_key)
-            .unwrap_or(Vec::new(&env));
-        history.push_back(types::GradeRecord {
-            waste_id,
-            grade,
-            grader: grader.clone(),
-            graded_at: env.ledger().timestamp(),
-        });
-        env.storage().instance().set(&history_key, &history);
-
-        let stats_key = ("stats", grader.clone());
-        let mut stats: RecyclingStats = env
-            .storage()
-            .instance()
-            .get(&stats_key)
-            .unwrap_or_else(|| RecyclingStats::new(grader.clone()));
-        stats.record_grade(grade);
-        env.storage().instance().set(&stats_key, &stats);
+        grading::record_grade(&env, waste_id, grade, &grader_participant);
 
         events::emit_waste_graded(&env, waste_id, grade, &grader);
 
@@ -4607,7 +4617,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
     /// Apply the grade multiplier to a base reward: `base * grade.multiplier_pct() / 100`.
     pub fn apply_grade_multiplier(base_reward: u64, grade: WasteGrade) -> u64 {
-        base_reward * grade.multiplier_pct() / 100
+        grading::apply_grade_multiplier(base_reward, grade)
     }
 
     /// Get aggregated grading analytics across all participants.
@@ -5538,6 +5548,25 @@ impl omni-stellar-omni-stellar-scavengerContract {
         let owner_share = (total_reward * (owner_pct as i128)) / 100;
         let mut total_distributed: i128 = 0;
 
+        // ── Checks-effects-interactions (issue: reentrancy audit) ───────────
+        // Commit the incentive-budget effect BEFORE issuing any external
+        // token transfers below. Previously `incentive.remaining_budget`
+        // was only decremented after every transfer had already been made,
+        // so a malicious token contract that reentered `distribute_reward`
+        // (or another budget-checking function) mid-loop would still see
+        // the pre-transfer budget and could drain more than `remaining_budget`
+        // allows. `total_reward` is fully computed above and does not change
+        // based on the loop below, so moving this update earlier is safe and
+        // does not alter the amounts paid out.
+        incentive.remaining_budget = incentive
+            .remaining_budget
+            .saturating_sub(total_reward as u64);
+        if incentive.remaining_budget == 0 {
+            incentive.active = false;
+        }
+        Self::set_incentive(&env, incentive_id, &incentive);
+        Self::add_to_total_tokens(&env, total_reward as u128);
+
         for transfer in transfers.iter() {
             let key = (transfer.to.clone(),);
             if let Some(p) = env.storage().instance().get::<_, Participant>(&key) {
@@ -5571,15 +5600,6 @@ impl omni-stellar-omni-stellar-scavengerContract {
                 waste_id,
             );
         }
-
-        incentive.remaining_budget = incentive
-            .remaining_budget
-            .saturating_sub(total_reward as u64);
-        if incentive.remaining_budget == 0 {
-            incentive.active = false;
-        }
-        Self::set_incentive(&env, incentive_id, &incentive);
-        Self::add_to_total_tokens(&env, total_reward as u128);
 
         total_reward
     }

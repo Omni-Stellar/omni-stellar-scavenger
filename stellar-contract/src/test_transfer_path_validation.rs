@@ -1,4 +1,5 @@
 #![cfg(test)]
+//! Transfer path validation test helpers.
 
 use crate::types::{ParticipantRole, WasteType};
 use crate::{omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient};
