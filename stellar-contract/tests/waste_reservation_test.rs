@@ -1,29 +1,13 @@
 #![cfg(test)]
 
+mod common;
+
+use common::setup::setup_with_recycler as setup;
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
     vec, Address, Env,
 };
 use stellar_scavngr_contract::{Error, ParticipantRole, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient, WasteType};
-
-fn setup(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient, Address, Address) {
-    let contract_id = env.register_contract(None, omni-stellar-omni-stellar-scavengerContract);
-    let client = omni-stellar-omni-stellar-scavengerContractClient::new(env, &contract_id);
-
-    let admin = Address::generate(env);
-    client.initialize_admin(&admin);
-
-    let recycler = Address::generate(env);
-    client.register_participant(
-        &recycler,
-        &ParticipantRole::Recycler,
-        &soroban_sdk::symbol_short!("recycler"),
-        &0,
-        &0,
-    );
-
-    (client, admin, recycler)
-}
 
 fn register_collector(client: &omni-stellar-omni-stellar-scavengerContractClient, env: &Env) -> Address {
     let collector = Address::generate(env);
