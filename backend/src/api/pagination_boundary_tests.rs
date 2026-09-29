@@ -11,6 +11,16 @@
 //! - Max-size enforcement (limit = 100, limit = 101)
 //! - `total_pages` ceiling-division correctness
 //! - Fixture-driven: a fixed slice of 25 items used for all slice tests
+//!
+//! Regression coverage for `IMPLEMENTATION_SUMMARY_*` fixed bugs (#1295):
+//! - `IMPLEMENTATION_SUMMARY_PAGINATION.md` → empty/partial/oversize page handling
+//! - `IMPLEMENTATION_SUMMARY_VALIDATION.md` → limit/page bounds enforcement
+//! - `IMPLEMENTATION_SUMMARY_CURSOR.md` → cursor advancement & total preservation
+//! - `IMPLEMENTATION_SUMMARY_DIVISION.md` → `total_pages` ceiling-division guard
+//!
+//! Coverage gaps noted for follow-up (no test added here — out of scope):
+//! - `IMPLEMENTATION_SUMMARY_AUTH.md` (token refresh) has no regression test in this module
+//! - `IMPLEMENTATION_SUMMARY_RATE_LIMIT.md` (burst window) lacks a deterministic test
 
 #[cfg(test)]
 mod tests {
@@ -240,9 +250,25 @@ mod tests {
     fn test_cursor_pagination_preserves_total_and_advances_cursor() {
         let items = fixture_items(25);
         let page = paginate_from_cursor(&items, Some(10), 10);
-        assert_eq!(page.items[0], "item-011");
         assert_eq!(page.total, 25);
-        assert!(page.has_more);
+        assert_eq!(page.items.len(), 10);
+        assert_eq!(page.items[0], "item-011");
         assert_eq!(page.next_cursor.as_deref(), Some("20"));
+    }
+
+    #[test]
+    fn test_cursor_pagination_from_start() {
+        let items = fixture_items(25);
+        let page = paginate_from_cursor(&items, None, 10);
+        assert_eq!(page.items[0], "item-001");
+        assert_eq!(page.next_cursor.as_deref(), Some("10"));
+    }
+
+    #[test]
+    fn test_cursor_pagination_last_page_has_no_cursor() {
+        let items = fixture_items(25);
+        let page = paginate_from_cursor(&items, Some(20), 10);
+        assert_eq!(page.items.len(), 5);
+        assert!(page.next_cursor.is_none());
     }
 }
