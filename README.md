@@ -24,3 +24,8 @@ A decentralized recycling platform built on Stellar blockchain using Soroban sma
 | [ADR: Multi-Service Architecture](docs/adr/0001-multi-service-architecture.md) | Why the repo is split into five services |
 
 ## Project Structure
+
+## Handsoff notes
+
+<!-- handsoff-issue-1291 -->
+- #1291: [Testing] Add test coverage reporting summary to `frontend/src/lib/validation/`
