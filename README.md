@@ -29,3 +29,6 @@ A decentralized recycling platform built on Stellar blockchain using Soroban sma
 
 <!-- handsoff-issue-1291 -->
 - #1291: [Testing] Add test coverage reporting summary to `frontend/src/lib/validation/`
+
+<!-- handsoff-issue-1293 -->
+- #1293: [Testing] Remove redundant unit tests duplicating E2E coverage in `frontend/src/components/__tests__/`
