@@ -17,6 +17,10 @@ pub mod reporting;
 pub mod storage;
 pub mod verification;
 pub mod webhook;
+
+#[cfg(test)]
+mod ml_classification_tests;
+
 pub use analytics::{AnalyticsService, AnomalyFlag, GlobalAnalytics, Metric, ParticipantAnalytics};
 pub use api::ApiBuilder;
 pub use archival::{
