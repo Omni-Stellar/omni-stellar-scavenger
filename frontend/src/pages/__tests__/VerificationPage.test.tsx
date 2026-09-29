@@ -291,7 +291,9 @@ describe('VerificationPage — notes input', () => {
     const input = screen.getByLabelText('Notes') as HTMLTextAreaElement
     const longText = 'a'.repeat(600)
     fireEvent.change(input, { target: { value: longText } })
-    expect(input.value.length).toBeLessThanOrEqual(500)
+    // The component should have maxLength attribute set
+    // Note: jsdom doesn't enforce maxLength on programmatic value changes
+    expect(input).toHaveAttribute('maxLength', '500')
   })
 })
 

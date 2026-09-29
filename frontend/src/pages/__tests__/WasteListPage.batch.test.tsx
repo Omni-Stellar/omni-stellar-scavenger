@@ -107,7 +107,7 @@ describe('WasteListPage — Batch Action Results', () => {
       setProgress({ completed: 0, total })
 
       for (let i = 0; i < total; i++) {
-        await new Promise((r) => setTimeout(r, 10))
+        await Promise.resolve()
         setProgress({ completed: i + 1, total })
       }
 

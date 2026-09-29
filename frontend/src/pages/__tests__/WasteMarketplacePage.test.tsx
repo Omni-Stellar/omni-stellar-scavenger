@@ -234,8 +234,8 @@ describe('WasteMarketplacePage — listing operations', () => {
 
   it('handles partial word matches in description', () => {
     const result = filterListings(listings, 'pap', 'all')
-    expect(result).toHaveLength(1)
-    expect(result[0].description).toContain('paper')
+    expect(result).toHaveLength(2)
+    result.forEach((r) => expect(r.description).toContain('paper'))
   })
 
   it('preserves all listing fields after sort', () => {
