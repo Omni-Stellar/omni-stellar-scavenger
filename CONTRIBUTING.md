@@ -3,13 +3,14 @@ cd ~/Desktop/004/omni-stellar-omni-stellar-scavenger
 # Backup
 cp CONTRIBUTING.md CONTRIBUTING.md.bak
 
+# 1. Replace the Getting Started / Setup section body with a pointer
 python3 - << 'PY'
 import re
 
 p = 'CONTRIBUTING.md'
 src = open(p).read()
 
-# 1) Replace the "Getting Started / Setup" section body with a pointer
+# Replace everything between "## Getting Started / Setup" and the next "## " heading
 pattern = r"## Getting Started / Setup\n(.*?)(?=\n## )"
 replacement = (
     "## Getting Started / Setup\n\n"
@@ -19,16 +20,12 @@ replacement = (
     "When setup steps change, update that file — not this one.\n\n"
 )
 new, n = re.subn(pattern, replacement, src, count=1, flags=re.S)
-print(f"Replaced Getting Started section (matched {n} time(s))")
+print(f"Replaced section (matched {n} time(s))")
 
-# 2) Remove the trailing conflicting "## Local Setup" block
-new = re.sub(
-    r"\n## Local Setup\n\nSee \[docs/getting-started\.md\]\(docs/getting-started\.md\)\.\n?$",
-    "\n",
-    new,
-)
+# 2. Remove the trailing conflicting "## Local Setup" block if present
+new = re.sub(r"\n## Local Setup\n\nSee \[docs/getting-started\.md\]\(docs/getting-started\.md\)\.\n?$", "\n", new)
 
-# 3) Safety net: strip any leftover conflict markers
+# 3. Also remove any leftover conflict markers (safety net)
 new = re.sub(r"^<{7} .*\n", "", new, flags=re.M)
 new = re.sub(r"^={7}\n", "", new, flags=re.M)
 new = re.sub(r"^>{7} .*\n", "", new, flags=re.M)

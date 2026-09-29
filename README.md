@@ -14,12 +14,13 @@ A decentralized recycling platform built on Stellar blockchain using Soroban sma
 | Document | Description |
 |----------|-------------|
 | [Architecture Diagram](docs/architecture-diagram.svg) | Visual overview of all system components and data flow |
-| [ADR: Stellar/Soroban](docs/adr/0008-stellar-soroban.md) | Why we build on Stellar and Soroban |
+| [Backend API Reference](docs/api/backend-reference.md) | HTTP endpoints exposed by the backend |
 | [Local Dev Setup Guide](docs/local-dev-setup.md) | Complete local development setup covering all four workspaces |
 | [API Reference Guide](docs/API_REFERENCE_GUIDE.md) | Comprehensive contract function reference with examples and quick reference cards |
 | [Deployment Runbook](docs/DEPLOYMENT_RUNBOOK.md) | Step-by-step testnet and mainnet deployment with rollback procedures |
 | [Troubleshooting Guide](docs/TROUBLESHOOTING_GUIDE.md) | Common errors, debugging tips, and performance tuning |
 | [User Guide](docs/USER_GUIDE.md) | End-user guide for the platform |
 | [Security Audit](docs/SECURITY_AUDIT.md) | Security audit findings and mitigations |
+| [ADR: Multi-Service Architecture](docs/adr/0001-multi-service-architecture.md) | Why the repo is split into five services |
 
 ## Project Structure
