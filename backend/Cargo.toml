@@ -62,6 +62,13 @@ sha2 = "=0.10.9"
 # mockall, tokio-test, tempfile removed by #1085: no `#[automock]`/`mock!`,
 # `tokio_test::`, or `tempfile::` reference anywhere in src/.
 wiremock = "=0.6.5"
+# #1292: integration tests for services/multichain.rs need a real async test
+# runtime plus a mock HTTP server for the sandbox chain endpoints. `tokio` is
+# already a normal dependency with the `full` feature, so `#[tokio::test]`
+# works in tests/ without re-declaring it here; `wiremock` above provides the
+# sandbox RPC stubs. `tokio-test` is re-added for `tokio_test::block_on` and
+# timeout helpers used by the cross-chain timeout scenarios.
+tokio-test = "=0.4.4"
 
 [lib]
 name = "omni-stellar-scavenger_backend"
