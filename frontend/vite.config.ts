@@ -126,6 +126,12 @@ export default defineConfig({
         environment: 'jsdom',
         setupFiles: ['./src/test/setup.tsx'],
         css: false,
+        // Snapshot tests for design-system component variants (issue #1290).
+        // Snapshots are stored in __snapshots__ directories next to each test.
+        // To update snapshots after an intentional visual change, run:
+        //   npx vitest run -u frontend/src/design-system
+        // Review the updated .snap files before committing them.
+        include: ['src/**/*.{test,spec}.{ts,tsx}'],
         coverage: {
           provider: 'v8',
           reporter: ['text', 'json', 'html', 'lcov'],
