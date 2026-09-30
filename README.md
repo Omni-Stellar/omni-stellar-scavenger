@@ -27,5 +27,11 @@ A decentralized recycling platform built on Stellar blockchain using Soroban sma
 
 ## Handsoff notes
 
-<!-- handsoff-issue-1287 -->
-- #1287: [Testing] Add unit tests for `backend/src/services/geospatial.rs`
+<!-- handsoff-issue-1291 -->
+- #1291: [Testing] Add test coverage reporting summary to `frontend/src/lib/validation/`
+
+<!-- handsoff-issue-1293 -->
+- #1293: [Testing] Remove redundant unit tests duplicating E2E coverage in `frontend/src/components/__tests__/`
+
+<!-- handsoff-issue-1294 -->
+- #1294: [Testing] Add test fixtures/mocks for `security-tests/` Stellar interactions
