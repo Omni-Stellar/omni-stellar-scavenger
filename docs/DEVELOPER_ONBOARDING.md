@@ -84,7 +84,7 @@ omni-stellar-omni-stellar-scavenger/
 | `stellar-contract/src/validation.rs` | Shared validation utilities |
 | `frontend/src/api/` | How the frontend talks to the contract |
 | `docs/ARCHITECTURE.md` | System design and data flow |
-| `docs/API_DOCUMENTATION.md` | All public contract functions documented |
+| `docs/API_REFERENCE.md` | All public contract functions documented |
 
 ---
 
