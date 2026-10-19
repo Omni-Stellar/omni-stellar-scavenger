@@ -1,0 +1,52 @@
+# Module ownership map — see CONTRIBUTING.md "Module Ownership Map" for details.
+# Later rules take precedence over earlier ones.
+
+# Global owners
+* @Omni-Stellar
+
+# Smart contract
+/stellar-contract/ @Omni-Stellar
+/contracts/ @Omni-Stellar
+
+# Frontend
+/frontend/ @Omni-Stellar
+
+# Backend services
+/backend/ @Omni-Stellar
+
+# Indexer
+/indexer/ @Omni-Stellar
+
+# Mobile app
+/mobile/ @Omni-Stellar
+
+# Shared packages (SDK)
+/packages/ @Omni-Stellar
+
+# Website
+/website/ @Omni-Stellar
+
+# Operational scripts
+/scripts/ @Omni-Stellar
+
+# Infrastructure
+/k8s/ @Omni-Stellar
+/terraform/ @Omni-Stellar
+/config/ @Omni-Stellar
+/docker-compose*.yml @Omni-Stellar
+
+# Test suites
+/integration-tests/ @Omni-Stellar
+/performance/ @Omni-Stellar
+/security-tests/ @Omni-Stellar
+
+# Demo
+/demo/ @Omni-Stellar
+
+# CI/CD
+/.github/ @Omni-Stellar
+
+# Docs
+/docs/ @Omni-Stellar
+CONTRIBUTING.md @Omni-Stellar
+SECURITY.md @Omni-Stellar

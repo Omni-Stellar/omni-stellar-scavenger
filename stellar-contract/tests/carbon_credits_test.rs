@@ -2,8 +2,8 @@
 
 use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, String};
 use stellar_scavngr_contract::{
-    calculate_carbon_credits, Material, ParticipantRole, RecyclingStats, omni-stellar-omni-stellar-scavengerContract,
-    omni-stellar-omni-stellar-scavengerContractClient, WasteType,
+    calculate_carbon_credits, Material, ParticipantRole, RecyclingStats, omni-stellar-omni-stellar-scavengerContract, omni-stellar-omni-stellar-scavengerContractClient,
+    WasteType,
 };
 
 fn setup(env: &Env) -> (omni-stellar-omni-stellar-scavengerContractClient, Address, Address) {
