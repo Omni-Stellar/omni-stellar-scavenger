@@ -25,6 +25,13 @@ spec:
             name: omni-stellar-scavenger-frontend
             port:
               number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: omni-stellar-scavenger-contract
+            port:
+              number: 80
   - host: api.omni-stellar-scavenger.app
     http:
       paths:
