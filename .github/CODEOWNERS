@@ -36,7 +36,7 @@
 /docker-compose*.yml @Omni-Stellar
 
 # Test suites
-/integration-tests/ @Omni-Stellar
+/tests/integration/ @Omni-Stellar
 /performance/ @Omni-Stellar
 /security-tests/ @Omni-Stellar
 

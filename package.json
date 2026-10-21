@@ -1,4 +1,9 @@
 {
+	"name": "omni-stellar-scavenger",
+	"private": true,
+	"scripts": {
+		"test:integration": "pnpm --filter omni-stellar-scavenger-integration-tests test"
+	},
 	"devDependencies": {
 		"ts-prune": "^0.10.3"
 	}

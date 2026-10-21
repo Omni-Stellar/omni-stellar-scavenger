@@ -174,7 +174,7 @@ omni-stellar-omni-stellar-scavenger/
 ├── terraform/              # Infrastructure as code (AWS)
 ├── k8s/                    # Kubernetes manifests
 ├── scripts/                # Build, deploy, and utility scripts
-├── integration-tests/      # End-to-end integration tests
+├── tests/integration/      # End-to-end integration tests
 ├── performance/            # Load testing scripts
 └── security-tests/         # Security / penetration test scripts
 ```
@@ -320,8 +320,7 @@ describe('WasteCard', () => {
 
 ```bash
 # Run integration tests (requires Docker)
-cd integration-tests
-npm test
+pnpm test:integration
 ```
 
 ---

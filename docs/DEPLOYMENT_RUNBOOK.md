@@ -249,7 +249,7 @@ cd frontend && npm install && npm run dev
 
 ```bash
 # Run automated smoke tests
-cd integration-tests
+cd tests/integration
 npm test -- --network testnet --contract $CONTRACT_ID
 
 # Manual: register a test participant
