@@ -4,6 +4,7 @@ packages:
   - 'backend'
   - 'frontend'
   - 'mobile'
+  - 'tests/integration'
 allowBuilds:
   '@firebase/util': true
   core-js: true

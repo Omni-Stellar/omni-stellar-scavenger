@@ -56,12 +56,12 @@ These tests run against a live environment. Set one up using the canonical guide
 first — Node.js, Docker, the Stellar network, Postgres, and the deployed contract are
 all covered there:
 
-➡️ **[Developer Onboarding Guide](../docs/DEVELOPER_ONBOARDING.md#development-environment-setup)**
+➡️ **[Developer Onboarding Guide](../../docs/DEVELOPER_ONBOARDING.md#development-environment-setup)**
 
 Then install and configure this suite:
 
 ```bash
-npm install
+pnpm install
 ```
 
 Create a `.env` in this directory pointing at your running environment:
@@ -79,35 +79,26 @@ up with `docker compose`, `DATABASE_URL` is
 
 ## Running Tests
 
-### All Integration Tests
+### All Integration Tests (from repo root)
 
 ```bash
-npm test
+pnpm test:integration
 ```
 
-### Specific Test Suites
+### Specific Test Suites (from this directory)
 
 ```bash
+# All integration tests
+pnpm test
+
 # Contract-Frontend integration
-npm run test:contract
+pnpm run test:contract
 
 # Contract-Backend integration
-npm run test:backend
+pnpm run test:backend
 
-# Database integration
-npm run test:database
-
-# Event handling
-npm run test:events
-
-# External API integration
-npm run test:api
-```
-
-### Watch Mode
-
-```bash
-npm run test:watch
+# Watch mode
+pnpm run test:watch
 ```
 
 ## Test Fixtures
@@ -150,12 +141,12 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
-      - run: npm install
-      - run: npm test
+      - run: pnpm install
+      - run: pnpm test:integration
 ```
 
 ## Troubleshooting

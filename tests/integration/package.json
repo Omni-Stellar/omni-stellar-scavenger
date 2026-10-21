@@ -2,6 +2,7 @@
   "name": "omni-stellar-scavenger-integration-tests",
   "version": "1.0.0",
   "description": "Integration tests for omni-stellar-omni-stellar-scavenger platform",
+  "private": true,
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
