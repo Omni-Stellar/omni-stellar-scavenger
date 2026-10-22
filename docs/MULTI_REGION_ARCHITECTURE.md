@@ -1,5 +1,8 @@
 # Multi-Region Architecture
 
+> Decision record: [ADR-0012](adr/0012-multi-region-active-passive.md).
+
+
 ## Overview
 The omni-stellar-omni-stellar-scavenger platform is deployed across multiple AWS regions to ensure high availability and disaster recovery. This document describes the architecture, failover mechanisms, and operational procedures.
 
