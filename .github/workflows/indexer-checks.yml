@@ -28,7 +28,14 @@ jobs:
           cache-dependency-path: indexer/package-lock.json
       - run: npm ci
         working-directory: indexer
-      - run: npx tsc --noEmit
+      - name: Build @scavngr/types (required for import resolver)
+        run: npm ci && npm run build
+        working-directory: packages/types
+      - name: Run ESLint (--max-warnings 0)
+        run: npm run lint
+        working-directory: indexer
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
         working-directory: indexer
 
   test:
