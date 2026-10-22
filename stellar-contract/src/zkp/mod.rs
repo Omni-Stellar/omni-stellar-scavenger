@@ -79,10 +79,10 @@
 //! ```
 
 // ── Shared ZKP primitives (issue #1521) ──────────────────────────────────────
-pub mod keys;
 pub mod encoding;
+pub mod keys;
 
-use soroban_sdk::{contracttype, symbol_short, Address, BytesN, Env};
+use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, BytesN, Env};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -194,20 +194,10 @@ pub fn verify_preimage(
 /// # Panics
 /// Panics if a commitment with the same `(committer, commitment_id)` already
 /// exists.
-pub fn store_commitment(
-    env: &Env,
-    committer: &Address,
-    commitment_id: u64,
-    hash: Commitment,
-    expires_at: u64,
-) {
+pub fn store_commitment(env: &Env, committer: &Address, commitment_id: u64, hash: Commitment, expires_at: u64) {
     let key = CommitmentKey::Commitment(committer.clone(), commitment_id);
-    if env
-        .storage()
-        .instance()
-        .has::<CommitmentKey>(&key)
-    {
-        panic!("zkp: commitment already exists");
+    if env.storage().instance().has::<CommitmentKey>(&key) {
+        panic_with_error!(env, crate::errors::Error::CommitmentAlreadyExists);
     }
     let record = CommitmentRecord {
         hash,
@@ -217,7 +207,9 @@ pub fn store_commitment(
         expires_at,
         status: CommitmentStatus::Pending,
     };
-    env.storage().instance().set::<CommitmentKey, CommitmentRecord>(&key, &record);
+    env.storage()
+        .instance()
+        .set::<CommitmentKey, CommitmentRecord>(&key, &record);
     env.events()
         .publish((symbol_short!("com_new"), committer), commitment_id);
 }
@@ -225,11 +217,7 @@ pub fn store_commitment(
 /// Retrieves a stored `CommitmentRecord`.
 ///
 /// Returns `Err(CommitmentError::NotFound)` if absent.
-pub fn get_commitment(
-    env: &Env,
-    committer: &Address,
-    commitment_id: u64,
-) -> Result<CommitmentRecord, CommitmentError> {
+pub fn get_commitment(env: &Env, committer: &Address, commitment_id: u64) -> Result<CommitmentRecord, CommitmentError> {
     let key = CommitmentKey::Commitment(committer.clone(), commitment_id);
     env.storage()
         .instance()
@@ -255,10 +243,10 @@ pub fn reveal_commitment(
 
     // Check lifecycle status
     match record.status {
-        CommitmentStatus::Verified  => return Err(CommitmentError::AlreadyVerified),
+        CommitmentStatus::Verified => return Err(CommitmentError::AlreadyVerified),
         CommitmentStatus::Cancelled => return Err(CommitmentError::Cancelled),
-        CommitmentStatus::Expired   => return Err(CommitmentError::Expired),
-        CommitmentStatus::Pending   => {}
+        CommitmentStatus::Expired => return Err(CommitmentError::Expired),
+        CommitmentStatus::Pending => {}
     }
 
     // Check expiry
@@ -284,11 +272,7 @@ pub fn reveal_commitment(
 /// Cancels a pending commitment.  Only the committer may cancel.
 ///
 /// The caller must have called `committer.require_auth()` before invoking this.
-pub fn cancel_commitment(
-    env: &Env,
-    committer: &Address,
-    commitment_id: u64,
-) -> Result<(), CommitmentError> {
+pub fn cancel_commitment(env: &Env, committer: &Address, commitment_id: u64) -> Result<(), CommitmentError> {
     let key = CommitmentKey::Commitment(committer.clone(), commitment_id);
     let mut record = get_commitment(env, committer, commitment_id)?;
 
@@ -352,7 +336,7 @@ mod tests {
     fn commitment_is_deterministic() {
         let env = Env::default();
         let secret = make_bytes32(&env, 0xAA);
-        let nonce  = make_bytes32(&env, 0xBB);
+        let nonce = make_bytes32(&env, 0xBB);
         let c1 = compute_commitment(&env, &secret, &nonce);
         let c2 = compute_commitment(&env, &secret, &nonce);
         assert_eq!(c1, c2);
@@ -364,7 +348,10 @@ mod tests {
         let s1 = make_bytes32(&env, 1);
         let s2 = make_bytes32(&env, 2);
         let nonce = make_bytes32(&env, 0xFF);
-        assert_ne!(compute_commitment(&env, &s1, &nonce), compute_commitment(&env, &s2, &nonce));
+        assert_ne!(
+            compute_commitment(&env, &s1, &nonce),
+            compute_commitment(&env, &s2, &nonce)
+        );
     }
 
     #[test]
@@ -373,7 +360,10 @@ mod tests {
         let secret = make_bytes32(&env, 0xAA);
         let n1 = make_bytes32(&env, 1);
         let n2 = make_bytes32(&env, 2);
-        assert_ne!(compute_commitment(&env, &secret, &n1), compute_commitment(&env, &secret, &n2));
+        assert_ne!(
+            compute_commitment(&env, &secret, &n1),
+            compute_commitment(&env, &secret, &n2)
+        );
     }
 
     // ── verify_preimage ───────────────────────────────────────────────────────
@@ -382,7 +372,7 @@ mod tests {
     fn verify_preimage_accepts_correct_preimage() {
         let env = Env::default();
         let secret = make_bytes32(&env, 0x01);
-        let nonce  = make_bytes32(&env, 0x02);
+        let nonce = make_bytes32(&env, 0x02);
         let commitment = compute_commitment(&env, &secret, &nonce);
         assert_eq!(verify_preimage(&env, &secret, &nonce, &commitment), Ok(()));
     }
@@ -390,9 +380,9 @@ mod tests {
     #[test]
     fn verify_preimage_rejects_wrong_secret() {
         let env = Env::default();
-        let secret  = make_bytes32(&env, 0x01);
+        let secret = make_bytes32(&env, 0x01);
         let wrong_s = make_bytes32(&env, 0x99);
-        let nonce   = make_bytes32(&env, 0x02);
+        let nonce = make_bytes32(&env, 0x02);
         let commitment = compute_commitment(&env, &secret, &nonce);
         assert_eq!(
             verify_preimage(&env, &wrong_s, &nonce, &commitment),
@@ -403,8 +393,8 @@ mod tests {
     #[test]
     fn verify_preimage_rejects_wrong_nonce() {
         let env = Env::default();
-        let secret  = make_bytes32(&env, 0x01);
-        let nonce   = make_bytes32(&env, 0x02);
+        let secret = make_bytes32(&env, 0x01);
+        let nonce = make_bytes32(&env, 0x02);
         let wrong_n = make_bytes32(&env, 0x77);
         let commitment = compute_commitment(&env, &secret, &nonce);
         assert_eq!(
@@ -420,8 +410,8 @@ mod tests {
         let env = Env::default();
         let committer = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         store_commitment(&env, &committer, 1, hash.clone(), 0);
         let record = get_commitment(&env, &committer, 1).unwrap();
         assert_eq!(record.hash, hash);
@@ -432,10 +422,7 @@ mod tests {
     fn get_nonexistent_commitment_returns_not_found() {
         let env = Env::default();
         let addr = Address::generate(&env);
-        assert_eq!(
-            get_commitment(&env, &addr, 99),
-            Err(CommitmentError::NotFound)
-        );
+        assert_eq!(get_commitment(&env, &addr, 99), Err(CommitmentError::NotFound));
     }
 
     #[test]
@@ -443,13 +430,10 @@ mod tests {
         let env = Env::default();
         let committer = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         store_commitment(&env, &committer, 1, hash, 0);
-        assert_eq!(
-            reveal_commitment(&env, &committer, 1, &secret, &nonce),
-            Ok(())
-        );
+        assert_eq!(reveal_commitment(&env, &committer, 1, &secret, &nonce), Ok(()));
         // Verify the record is now marked Verified
         let record = get_commitment(&env, &committer, 1).unwrap();
         assert_eq!(record.status, CommitmentStatus::Verified);
@@ -460,8 +444,8 @@ mod tests {
         let env = Env::default();
         let committer = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         store_commitment(&env, &committer, 1, hash, 0);
         let bad_secret = make_bytes32(&env, 0xFF);
         assert_eq!(
@@ -475,8 +459,8 @@ mod tests {
         let env = Env::default();
         let committer = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         store_commitment(&env, &committer, 1, hash, 0);
         reveal_commitment(&env, &committer, 1, &secret, &nonce).unwrap();
         assert_eq!(
@@ -490,8 +474,8 @@ mod tests {
         let env = Env::default();
         let committer = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         store_commitment(&env, &committer, 1, hash, 0);
         assert_eq!(cancel_commitment(&env, &committer, 1), Ok(()));
         let record = get_commitment(&env, &committer, 1).unwrap();
@@ -503,14 +487,11 @@ mod tests {
         let env = Env::default();
         let committer = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         store_commitment(&env, &committer, 1, hash, 0);
         reveal_commitment(&env, &committer, 1, &secret, &nonce).unwrap();
-        assert_eq!(
-            cancel_commitment(&env, &committer, 1),
-            Err(CommitmentError::NotPending)
-        );
+        assert_eq!(cancel_commitment(&env, &committer, 1), Err(CommitmentError::NotPending));
     }
 
     #[test]
@@ -519,11 +500,11 @@ mod tests {
         env.ledger().set_timestamp(1000);
         let committer = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         // expires_at is in the past (from the perspective of a later call)
         store_commitment(&env, &committer, 1, hash, 500); // expires at 500
-        // Advance time past expiry
+                                                          // Advance time past expiry
         env.ledger().set_timestamp(1500);
         assert_eq!(
             reveal_commitment(&env, &committer, 1, &secret, &nonce),
@@ -551,7 +532,7 @@ mod tests {
         let mut secret_bytes = [0xABu8; 32];
         let nonce_bytes = [0xCDu8; 32];
         let secret = BytesN::from_array(&env, &secret_bytes);
-        let nonce  = BytesN::from_array(&env, &nonce_bytes);
+        let nonce = BytesN::from_array(&env, &nonce_bytes);
         let commitment = compute_commitment(&env, &secret, &nonce);
 
         // Tamper: flip one bit in byte 0
@@ -571,7 +552,7 @@ mod tests {
         let secret_bytes = [0xABu8; 32];
         let mut nonce_bytes = [0xCDu8; 32];
         let secret = BytesN::from_array(&env, &secret_bytes);
-        let nonce  = BytesN::from_array(&env, &nonce_bytes);
+        let nonce = BytesN::from_array(&env, &nonce_bytes);
         let commitment = compute_commitment(&env, &secret, &nonce);
 
         // Tamper: flip one bit in the last nonce byte
@@ -589,7 +570,7 @@ mod tests {
     fn all_zeros_commitment_rejected() {
         let env = Env::default();
         let secret = make_bytes32(&env, 0xAA);
-        let nonce  = make_bytes32(&env, 0xBB);
+        let nonce = make_bytes32(&env, 0xBB);
         let zero_commitment: Commitment = BytesN::from_array(&env, &[0u8; 32]);
         assert_eq!(
             verify_preimage(&env, &secret, &nonce, &zero_commitment),
@@ -603,7 +584,7 @@ mod tests {
     fn all_ones_commitment_rejected() {
         let env = Env::default();
         let secret = make_bytes32(&env, 0xAA);
-        let nonce  = make_bytes32(&env, 0xBB);
+        let nonce = make_bytes32(&env, 0xBB);
         let ones_commitment: Commitment = BytesN::from_array(&env, &[0xFFu8; 32]);
         assert_eq!(
             verify_preimage(&env, &secret, &nonce, &ones_commitment),
@@ -616,7 +597,7 @@ mod tests {
     fn swapped_secret_nonce_rejected() {
         let env = Env::default();
         let secret = make_bytes32(&env, 0x01);
-        let nonce  = make_bytes32(&env, 0x02);
+        let nonce = make_bytes32(&env, 0x02);
         let commitment = compute_commitment(&env, &secret, &nonce);
         // Verify with secret and nonce swapped
         assert_eq!(
@@ -633,8 +614,8 @@ mod tests {
         let env = Env::default();
         let committer = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         store_commitment(&env, &committer, 1, hash, 0);
 
         // Attempt to reveal with tampered secret
@@ -655,8 +636,8 @@ mod tests {
         let env = Env::default();
         let committer = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         store_commitment(&env, &committer, 1, hash, 0);
 
         let bad_nonce = make_bytes32(&env, 0x21);
@@ -673,10 +654,10 @@ mod tests {
     fn wrong_committer_returns_not_found() {
         let env = Env::default();
         let alice = Address::generate(&env);
-        let bob   = Address::generate(&env);
+        let bob = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         store_commitment(&env, &alice, 1, hash, 0);
 
         // Bob tries to reveal Alice's commitment using his address
@@ -693,8 +674,8 @@ mod tests {
         let env = Env::default();
         let committer = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         store_commitment(&env, &committer, 1, hash, 0);
         cancel_commitment(&env, &committer, 1).unwrap();
 
@@ -712,8 +693,8 @@ mod tests {
         let env = Env::default();
         let committer = Address::generate(&env);
         let secret = make_bytes32(&env, 0x10);
-        let nonce  = make_bytes32(&env, 0x20);
-        let hash   = compute_commitment(&env, &secret, &nonce);
+        let nonce = make_bytes32(&env, 0x20);
+        let hash = compute_commitment(&env, &secret, &nonce);
         store_commitment(&env, &committer, 42, hash.clone(), 0);
         // Second store with same committer + id must panic
         store_commitment(&env, &committer, 42, hash, 0);
@@ -724,10 +705,7 @@ mod tests {
     fn cancel_nonexistent_commitment_returns_not_found() {
         let env = Env::default();
         let addr = Address::generate(&env);
-        assert_eq!(
-            cancel_commitment(&env, &addr, 999),
-            Err(CommitmentError::NotFound)
-        );
+        assert_eq!(cancel_commitment(&env, &addr, 999), Err(CommitmentError::NotFound));
     }
 
     /// All 256 single-byte secret values produce distinct commitments

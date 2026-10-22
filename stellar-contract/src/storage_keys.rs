@@ -15,7 +15,7 @@
 //! Each key constant has a doc comment explaining its purpose and the
 //! issue it was introduced for.
 
-use soroban_sdk::{Address, Env, Symbol};
+use soroban_sdk::{Address, Symbol};
 
 // ── Instance Storage Keys ─────────────────────────────────────────────
 // These are Soroban Symbol constants used in instance storage.
@@ -180,57 +180,67 @@ pub fn participant_key(address: &Address) -> (Address,) {
 }
 
 /// Returns the waste v2 storage key.
-pub fn waste_v2_key(waste_id: u128) -> (String, u128) {
-    ("waste_v2".to_string(), waste_id)
+pub fn waste_v2_key(waste_id: u128) -> (&'static str, u128) {
+    ("waste_v2", waste_id)
 }
 
 /// Returns the waste storage key (v1).
-pub fn waste_key(waste_id: u64) -> (String, u64) {
+pub fn waste_key(waste_id: u64) -> (&'static str, u64) {
     ("waste", waste_id)
 }
 
 /// Returns the grade history storage key.
-pub fn grade_history_key(waste_id: u128) -> (String, u128) {
+pub fn grade_history_key(waste_id: u128) -> (&'static str, u128) {
     ("grade_history", waste_id)
 }
 
 /// Returns the stats storage key for a participant.
-pub fn stats_key(address: &Address) -> (String, Address) {
+pub fn stats_key(address: &Address) -> (&'static str, Address) {
     ("stats", address.clone())
 }
 
+/// Returns the per-participant waste-ID index key.
+pub fn participant_waste_key(address: &Address) -> (&'static str, Address) {
+    ("participant_wastes", address.clone())
+}
+
+/// Returns the legacy transfer history storage key (v1 waste IDs).
+pub fn v1_transfer_history_key(waste_id: u64) -> (&'static str, u64) {
+    ("transfers", waste_id)
+}
+
 /// Returns the transfer history storage key.
-pub fn transfer_history_key(waste_id: u128) -> (String, u128) {
+pub fn transfer_history_key(waste_id: u128) -> (&'static str, u128) {
     ("transfer_history", waste_id)
 }
 
 /// Returns the waste count key.
-pub fn waste_count_key() -> (String,) {
+pub fn waste_count_key() -> (&'static str,) {
     ("waste_count",)
 }
 
 /// Returns the incentive count key.
-pub fn incentive_count_key() -> (String,) {
+pub fn incentive_count_key() -> (&'static str,) {
     ("incentive_count",)
 }
 
 /// Returns the incentive storage key.
-pub fn incentive_key(incentive_id: u64) -> (String, u64) {
+pub fn incentive_key(incentive_id: u64) -> (&'static str, u64) {
     ("incentive", incentive_id)
 }
 
 /// Returns the auction storage key.
-pub fn auction_key(auction_id: u64) -> (String, u64) {
+pub fn auction_key(auction_id: u64) -> (&'static str, u64) {
     ("auction", auction_id)
 }
 
 /// Returns the AI grade confidence key.
-pub fn ai_grade_conf_key(waste_id: u128) -> (String, u128) {
+pub fn ai_grade_conf_key(waste_id: u128) -> (&'static str, u128) {
     ("ai_grade_conf", waste_id)
 }
 
 /// Returns the per-participant recycling stats storage key (issue #1514).
-pub fn recycling_stats_key(address: &Address) -> (String, Address) {
+pub fn recycling_stats_key(address: &Address) -> (&'static str, Address) {
     ("recycling_stats", address.clone())
 }
 
@@ -247,25 +257,50 @@ mod tests {
     #[test]
     fn test_symbol_key_length_constraint() {
         let keys: Vec<Symbol> = vec![
-            ADMINS, CHARITY, REWARD_CFG, TOTAL_WEIGHT, TOTAL_TOKENS,
-            REENTRANCY_GUARD, TOKEN_ADDR, PART_INDEX, PAUSED,
-            MULTISIG_THRESHOLD, PROPOSAL_COUNT, MIN_WEIGHT,
-            CHALLENGE_COUNT, PENDING_XFR_CNT, MILESTONES_KEY,
-            AUCTION_COUNT, SEASONAL_MUL, TOTAL_CARBON, CONTAMINATED_LIST,
-            CARB_LIST_CNT, CARB_LIST_IDX, DISPUTE_CNT, ROUTE_CNT,
-            PERMISSIONS, RECONCIL_LOG, QUALITY_SCORES, LOCATION_HISTORY,
-            BATCH_COUNT, BATCH_INDEX, CERTIFICATIONS, REPORT_COUNT,
-            REPORTS, TRANSACTION_STATS, PERF_SNAPSHOTS,
-            TRANSFER_THRESHOLD, REQUIRED_APPROVERS, TRANSFER_APPROVALS,
-            GLOBAL_METRICS_SNAPSHOT, ANALYTICS_LAST_UPDATE, ANALYTICS_BATCH_COUNT,
+            ADMINS,
+            CHARITY,
+            REWARD_CFG,
+            TOTAL_WEIGHT,
+            TOTAL_TOKENS,
+            REENTRANCY_GUARD,
+            TOKEN_ADDR,
+            PART_INDEX,
+            PAUSED,
+            MULTISIG_THRESHOLD,
+            PROPOSAL_COUNT,
+            MIN_WEIGHT,
+            CHALLENGE_COUNT,
+            PENDING_XFR_CNT,
+            MILESTONES_KEY,
+            AUCTION_COUNT,
+            SEASONAL_MUL,
+            TOTAL_CARBON,
+            CONTAMINATED_LIST,
+            CARB_LIST_CNT,
+            CARB_LIST_IDX,
+            DISPUTE_CNT,
+            ROUTE_CNT,
+            PERMISSIONS,
+            RECONCIL_LOG,
+            QUALITY_SCORES,
+            LOCATION_HISTORY,
+            BATCH_COUNT,
+            BATCH_INDEX,
+            CERTIFICATIONS,
+            REPORT_COUNT,
+            REPORTS,
+            TRANSACTION_STATS,
+            PERF_SNAPSHOTS,
+            TRANSFER_THRESHOLD,
+            REQUIRED_APPROVERS,
+            TRANSFER_APPROVALS,
+            GLOBAL_METRICS_SNAPSHOT,
+            ANALYTICS_LAST_UPDATE,
+            ANALYTICS_BATCH_COUNT,
         ];
         for key in keys {
             let s = key.to_string();
-            assert!(
-                s.len() <= 9,
-                "Symbol key '{}' exceeds 9-char limit",
-                s
-            );
+            assert!(s.len() <= 9, "Symbol key '{}' exceeds 9-char limit", s);
         }
     }
 
@@ -273,25 +308,45 @@ mod tests {
     #[test]
     fn test_no_symbol_key_collisions() {
         let keys = vec![
-            ADMINS.to_string(), CHARITY.to_string(), REWARD_CFG.to_string(),
-            TOTAL_WEIGHT.to_string(), TOTAL_TOKENS.to_string(),
-            REENTRANCY_GUARD.to_string(), TOKEN_ADDR.to_string(),
-            PART_INDEX.to_string(), PAUSED.to_string(),
-            MULTISIG_THRESHOLD.to_string(), PROPOSAL_COUNT.to_string(),
-            MIN_WEIGHT.to_string(), CHALLENGE_COUNT.to_string(),
-            PENDING_XFR_CNT.to_string(), MILESTONES_KEY.to_string(),
-            AUCTION_COUNT.to_string(), SEASONAL_MUL.to_string(),
-            TOTAL_CARBON.to_string(), CONTAMINATED_LIST.to_string(),
-            CARB_LIST_CNT.to_string(), CARB_LIST_IDX.to_string(),
-            DISPUTE_CNT.to_string(), ROUTE_CNT.to_string(),
-            PERMISSIONS.to_string(), RECONCIL_LOG.to_string(),
-            QUALITY_SCORES.to_string(), LOCATION_HISTORY.to_string(),
-            BATCH_COUNT.to_string(), BATCH_INDEX.to_string(),
-            CERTIFICATIONS.to_string(), REPORT_COUNT.to_string(),
-            REPORTS.to_string(), TRANSACTION_STATS.to_string(),
-            PERF_SNAPSHOTS.to_string(), TRANSFER_THRESHOLD.to_string(),
-            REQUIRED_APPROVERS.to_string(), TRANSFER_APPROVALS.to_string(),
-            GLOBAL_METRICS_SNAPSHOT.to_string(), ANALYTICS_LAST_UPDATE.to_string(),
+            ADMINS.to_string(),
+            CHARITY.to_string(),
+            REWARD_CFG.to_string(),
+            TOTAL_WEIGHT.to_string(),
+            TOTAL_TOKENS.to_string(),
+            REENTRANCY_GUARD.to_string(),
+            TOKEN_ADDR.to_string(),
+            PART_INDEX.to_string(),
+            PAUSED.to_string(),
+            MULTISIG_THRESHOLD.to_string(),
+            PROPOSAL_COUNT.to_string(),
+            MIN_WEIGHT.to_string(),
+            CHALLENGE_COUNT.to_string(),
+            PENDING_XFR_CNT.to_string(),
+            MILESTONES_KEY.to_string(),
+            AUCTION_COUNT.to_string(),
+            SEASONAL_MUL.to_string(),
+            TOTAL_CARBON.to_string(),
+            CONTAMINATED_LIST.to_string(),
+            CARB_LIST_CNT.to_string(),
+            CARB_LIST_IDX.to_string(),
+            DISPUTE_CNT.to_string(),
+            ROUTE_CNT.to_string(),
+            PERMISSIONS.to_string(),
+            RECONCIL_LOG.to_string(),
+            QUALITY_SCORES.to_string(),
+            LOCATION_HISTORY.to_string(),
+            BATCH_COUNT.to_string(),
+            BATCH_INDEX.to_string(),
+            CERTIFICATIONS.to_string(),
+            REPORT_COUNT.to_string(),
+            REPORTS.to_string(),
+            TRANSACTION_STATS.to_string(),
+            PERF_SNAPSHOTS.to_string(),
+            TRANSFER_THRESHOLD.to_string(),
+            REQUIRED_APPROVERS.to_string(),
+            TRANSFER_APPROVALS.to_string(),
+            GLOBAL_METRICS_SNAPSHOT.to_string(),
+            ANALYTICS_LAST_UPDATE.to_string(),
             ANALYTICS_BATCH_COUNT.to_string(),
         ];
         let mut unique = keys.clone();
@@ -327,7 +382,7 @@ mod tests {
         let env = Env::default();
         let addr = Address::generate(&env);
 
-        let keys: Vec<(String, u128)> = vec![
+        let keys: Vec<(&'static str, u128)> = vec![
             waste_v2_key(1),
             grade_history_key(1),
             transfer_history_key(1),
