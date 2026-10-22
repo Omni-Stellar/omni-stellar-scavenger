@@ -11,13 +11,6 @@ const mockConfig = {
   network: 'TESTNET' as const,
 }
 
-const mockGetActiveMfrIncentive = vi.fn()
-const mockGetIncentives = vi.fn()
-const mockGetMaterial = vi.fn()
-const mockGetStats = vi.fn()
-const mockCreateIncentive = vi.fn()
-const mockConfirmWasteDetails = vi.fn()
-
 vi.mock('@/context/WalletContext', () => ({
   useWallet: () => mockWallet,
 }))
@@ -30,15 +23,27 @@ vi.mock('@/lib/stellar', () => ({
   getNetworkPassphrase: () => 'Test SDF Network ; September 2015',
 }))
 
+// ── Centralised omni-stellar-omni-stellar-scavengerClient mock (#1546) ──────────────────────────────────
+import { createMockClient } from '@/test-utils/mockomni-stellar-omni-stellar-scavengerClient'
+
+const mockGetActiveMfrIncentive = vi.fn()
+const mockGetIncentives = vi.fn()
+const mockGetMaterial = vi.fn()
+const mockGetStats = vi.fn()
+const mockCreateIncentive = vi.fn()
+const mockConfirmWasteDetails = vi.fn()
+
 vi.mock('@/api/client', () => ({
-  omni-stellar-omni-stellar-scavengerClient: vi.fn().mockImplementation(() => ({
-    getActiveMfrIncentive: mockGetActiveMfrIncentive,
-    getIncentives: mockGetIncentives,
-    getMaterial: mockGetMaterial,
-    getStats: mockGetStats,
-    createIncentive: mockCreateIncentive,
-    confirmWasteDetails: mockConfirmWasteDetails,
-  })),
+  omni-stellar-omni-stellar-scavengerClient: vi.fn().mockImplementation(() =>
+    createMockClient({
+      getActiveMfrIncentive: mockGetActiveMfrIncentive,
+      getIncentives: mockGetIncentives,
+      getMaterial: mockGetMaterial,
+      getStats: mockGetStats,
+      createIncentive: mockCreateIncentive,
+      confirmWasteDetails: mockConfirmWasteDetails,
+    })
+  ),
 }))
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -46,6 +51,7 @@ vi.mock('@/api/client', () => ({
 describe('useManufacturerDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockWallet.address = 'G1234567890ABCDEF'
     mockGetActiveMfrIncentive.mockResolvedValue(null)
     mockGetIncentives.mockResolvedValue([])
     mockGetMaterial.mockResolvedValue(null)
