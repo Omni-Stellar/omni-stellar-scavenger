@@ -302,7 +302,6 @@ pub enum Error {
     WasteFrozen = 50,
 
     // ── RBAC errors (#704) ────────────────────────────────────────────────────
-
     /// (51) The caller does not have the required permission for this operation.
     /// Returned by: any permission-guarded function
     PermissionDenied = 51,
@@ -312,7 +311,6 @@ pub enum Error {
     InvalidPermission = 52,
 
     // ── Reconciliation errors (#706) ─────────────────────────────────────────
-
     /// (53) The waste item has no weight discrepancy to reconcile.
     /// Returned by: `reconcile_waste`
     NoDiscrepancy = 53,
@@ -330,7 +328,6 @@ pub enum Error {
     // external callers), but new call sites in those subsystems should
     // prefer these shared variants so the crate converges on a single
     // source of truth over time. No existing numeric codes were renumbered.
-
     /// (55) No key has been installed for this purpose yet.
     KeyRotationNoActiveKey = 55,
     /// (56) The requested (purpose, version) pair does not exist.
@@ -355,6 +352,14 @@ pub enum Error {
     CommitmentExpired = 65,
     /// (66) Commitment is still pending — cannot cancel a verified commitment.
     CommitmentNotPending = 66,
+    /// (67) A supplied value or payload is malformed.
+    InvalidInput = 67,
+    /// (68) A requested record or resource does not exist.
+    NotFound = 68,
+    /// (69) The resource is in a state that does not permit this operation.
+    InvalidState = 69,
+    /// (70) A ZKP commitment already exists for this (committer, id) pair.
+    CommitmentAlreadyExists = 70,
 }
 
 // ── Issue #760: error categorization and context ──────────────────────────────
@@ -407,7 +412,8 @@ impl Error {
             | Error::WeightMismatch
             | Error::LocationMismatch
             | Error::InvalidSchedule
-            | Error::InvalidListing => ErrorCategory::Input,
+            | Error::InvalidListing
+            | Error::InvalidInput => ErrorCategory::Input,
 
             Error::WasteDeactivated
             | Error::WasteAlreadyDeactivated
@@ -428,7 +434,9 @@ impl Error {
             | Error::InsufficientCarbonCredits
             | Error::CarbonListingInactive
             | Error::NoDiscrepancy
-            | Error::ReconciliationThresholdExceeded => ErrorCategory::State,
+            | Error::ReconciliationThresholdExceeded
+            | Error::InvalidState
+            | Error::CommitmentAlreadyExists => ErrorCategory::State,
 
             Error::WasteNotFound
             | Error::MaterialNotFound
@@ -450,6 +458,8 @@ impl Error {
             | Error::CommitmentCancelled
             | Error::CommitmentExpired
             | Error::CommitmentNotPending => ErrorCategory::Auth,
+
+            Error::NotFound => ErrorCategory::NotFound,
 
             Error::CharityNotSet | Error::TokenAddressNotSet => ErrorCategory::Config,
         }
@@ -496,6 +506,8 @@ impl Error {
             Error::WasteReservedByOther => "STATE/WASTE_RESERVED_BY_OTHER",
             Error::WasteExpired => "STATE/WASTE_EXPIRED",
             Error::WasteFrozen => "STATE/WASTE_FROZEN",
+            Error::InvalidInput => "INPUT/INVALID_INPUT",
+            Error::NotFound => "NOT_FOUND",
             Error::IncentiveInactive => "STATE/INCENTIVE_INACTIVE",
             Error::MaterialNotVerified => "STATE/MATERIAL_NOT_VERIFIED",
             Error::NoRewardAvailable => "STATE/NO_REWARD_AVAILABLE",
@@ -525,6 +537,8 @@ impl Error {
             Error::CommitmentCancelled => "AUTH/COMMITMENT_CANCELLED",
             Error::CommitmentExpired => "AUTH/COMMITMENT_EXPIRED",
             Error::CommitmentNotPending => "AUTH/COMMITMENT_NOT_PENDING",
+            Error::InvalidState => "STATE/INVALID_STATE",
+            Error::CommitmentAlreadyExists => "STATE/COMMITMENT_ALREADY_EXISTS",
         }
     }
 
@@ -550,15 +564,15 @@ mod tests {
     #[test]
     fn error_codes_are_unique() {
         let all: &[(u32, Error)] = &[
-            (1,  Error::AlreadyInitialized),
-            (2,  Error::Unauthorized),
-            (3,  Error::NotRegistered),
-            (4,  Error::AlreadyRegistered),
-            (5,  Error::NotManufacturer),
-            (6,  Error::NotWasteOwner),
-            (7,  Error::WasteNotFound),
-            (8,  Error::MaterialNotFound),
-            (9,  Error::IncentiveNotFound),
+            (1, Error::AlreadyInitialized),
+            (2, Error::Unauthorized),
+            (3, Error::NotRegistered),
+            (4, Error::AlreadyRegistered),
+            (5, Error::NotManufacturer),
+            (6, Error::NotWasteOwner),
+            (7, Error::WasteNotFound),
+            (8, Error::MaterialNotFound),
+            (9, Error::IncentiveNotFound),
             (10, Error::ParticipantNotFound),
             (11, Error::InvalidAmount),
             (12, Error::InvalidWeight),
@@ -639,7 +653,10 @@ mod tests {
         assert!(code.starts_with("NOT_FOUND/"), "expected NOT_FOUND/ prefix, got {code}");
 
         let code = Error::Overflow.code();
-        assert!(code.starts_with("ARITHMETIC/"), "expected ARITHMETIC/ prefix, got {code}");
+        assert!(
+            code.starts_with("ARITHMETIC/"),
+            "expected ARITHMETIC/ prefix, got {code}"
+        );
     }
 
     #[test]

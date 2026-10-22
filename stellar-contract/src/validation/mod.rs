@@ -11,15 +11,15 @@
 //! * [`waste_batch`] — waste submission/batch rules.
 //! * [`transfer`] — transfer and reward-split rules.
 //!
-//! The original flat panic-based functions remain here unchanged (by name
-//! and behavior) so existing call sites (`validation::validate_weight`,
-//! `validation::validate_coordinates`, etc.) keep working without
-//! modification. The new per-entity modules provide `Result`-returning
-//! wrappers using the shared [`ValidationError`] type for callers that want
-//! to handle invalid input without panicking, and are independently
-//! unit-testable.
+//! The legacy helpers remain here under their original names but now emit
+//! typed contract errors via `panic_with_error!` instead of string panics, so
+//! existing call sites only need an `Env` argument. The per-entity modules
+//! provide `Result`-returning wrappers using the shared [`ValidationError`]
+//! type for callers that want to handle invalid input directly.
 
-use soroban_sdk::{Address, Env, String, Vec};
+use soroban_sdk::{panic_with_error, Address, Env, String, Vec};
+
+use crate::errors::Error;
 
 pub mod participant;
 pub mod transfer;
@@ -82,16 +82,16 @@ pub enum ValidationError {
 
 /// Panics if `amount` is not positive (> 0).
 #[allow(dead_code)]
-pub fn validate_positive_amount(amount: i128, field_name: &str) {
+pub fn validate_positive_amount(env: &Env, amount: i128, field_name: &str) {
     if amount <= 0 {
-        panic!("{} must be greater than zero", field_name);
+        panic_with_error!(env, Error::InvalidAmount);
     }
 }
 
 /// Panics if `amount` is not positive (u128 variant, rejects zero).
-pub fn validate_positive_u128(amount: u128, field_name: &str) {
+pub fn validate_positive_u128(env: &Env, amount: u128, field_name: &str) {
     if amount == 0 {
-        panic!("{} must be greater than zero", field_name);
+        panic_with_error!(env, Error::InvalidAmount);
     }
 }
 
@@ -99,15 +99,9 @@ pub fn validate_positive_u128(amount: u128, field_name: &str) {
 ///
 /// Panics if weight is below `MIN_WASTE_WEIGHT` (100 g) or above
 /// `MAX_WASTE_WEIGHT` (1 000 000 kg).
-pub fn validate_weight(weight: u128, field_name: &str) {
-    if weight < MIN_WASTE_WEIGHT {
-        panic!("{} must be at least {} grams", field_name, MIN_WASTE_WEIGHT);
-    }
-    if weight > MAX_WASTE_WEIGHT {
-        panic!(
-            "{} must not exceed {} grams (1 000 000 kg)",
-            field_name, MAX_WASTE_WEIGHT
-        );
+pub fn validate_weight(env: &Env, weight: u128, field_name: &str) {
+    if weight < MIN_WASTE_WEIGHT || weight > MAX_WASTE_WEIGHT {
+        panic_with_error!(env, Error::InvalidWeight);
     }
 }
 
@@ -117,61 +111,58 @@ pub fn validate_weight(weight: u128, field_name: &str) {
 /// avoid a duplicate-definition conflict with the field-name variant above;
 /// callers passing an explicit ceiling (rather than the global
 /// `MAX_WASTE_WEIGHT` constant) should use this.
-pub fn validate_weight_max(weight: u128, max: u128) {
-    validate_positive_u128(weight, "Waste weight");
+pub fn validate_weight_max(env: &Env, weight: u128, max: u128) {
+    validate_positive_u128(env, weight, "Waste weight");
     if weight > max {
-        panic!("Waste weight exceeds maximum allowed");
+        panic_with_error!(env, Error::InvalidWeight);
     }
 }
 
 /// Validates a non-negative i128 token amount (allows 0).
 #[allow(dead_code)]
-pub fn validate_non_negative(amount: i128, field_name: &str) {
+pub fn validate_non_negative(env: &Env, amount: i128, field_name: &str) {
     if amount < 0 {
-        panic!("{} cannot be negative", field_name);
+        panic_with_error!(env, Error::InvalidAmount);
     }
 }
 
 // ── Percentage validators ─────────────────────────────────────────────────────
 
 /// Panics if `percentage` is greater than 100.
-pub fn validate_percentage(percentage: u32, field_name: &str) {
+pub fn validate_percentage(env: &Env, percentage: u32, field_name: &str) {
     if percentage > 100 {
-        panic!("{} must be <= 100", field_name);
+        panic_with_error!(env, Error::InvalidPercentage);
     }
 }
 
 /// Validates that two reward-distribution percentages don't sum past 100.
-pub fn validate_percentage_sum(collector_percentage: u32, owner_percentage: u32) {
+pub fn validate_percentage_sum(env: &Env, collector_percentage: u32, owner_percentage: u32) {
     if collector_percentage + owner_percentage > 100 {
-        panic!("Total percentages cannot exceed 100");
+        panic_with_error!(env, Error::InvalidPercentage);
     }
 }
 
 /// Validates that collector and owner percentages together do not exceed 100.
-pub fn validate_reward_percentages(collector_pct: u32, owner_pct: u32) {
+pub fn validate_reward_percentages(env: &Env, collector_pct: u32, owner_pct: u32) {
     if collector_pct + owner_pct > 100 {
-        panic!("Total percentages cannot exceed 100");
+        panic_with_error!(env, Error::InvalidPercentage);
     }
 }
 
 /// Validates a basis-point value (0–10 000 = 0%–100%).
 #[allow(dead_code)]
-pub fn validate_bps(bps: u32, field_name: &str) {
+pub fn validate_bps(env: &Env, bps: u32, field_name: &str) {
     if bps > 10_000 {
-        panic!("{} must be <= 10 000 basis points", field_name);
+        panic_with_error!(env, Error::InvalidPercentage);
     }
 }
 
 // ── Coordinate validators ─────────────────────────────────────────────────────
 
 /// Validates WGS-84 coordinates stored as microdegrees.
-pub fn validate_coordinates(latitude: i128, longitude: i128) {
-    if !(-MAX_LAT..=MAX_LAT).contains(&latitude) {
-        panic!("Latitude must be between -90 and +90 degrees");
-    }
-    if !(-MAX_LON..=MAX_LON).contains(&longitude) {
-        panic!("Longitude must be between -180 and +180 degrees");
+pub fn validate_coordinates(env: &Env, latitude: i128, longitude: i128) {
+    if !(-MAX_LAT..=MAX_LAT).contains(&latitude) || !(-MAX_LON..=MAX_LON).contains(&longitude) {
+        panic_with_error!(env, Error::InvalidCoordinates);
     }
 }
 
@@ -180,63 +171,63 @@ pub fn validate_coordinates(latitude: i128, longitude: i128) {
 /// Panics if `address` equals the current contract address.
 pub fn validate_address_not_contract(env: &Env, address: &Address) {
     if address == &env.current_contract_address() {
-        panic!("Address cannot be the contract itself");
+        panic_with_error!(env, Error::SameAddress);
     }
 }
 
 /// Panics if `addr1` equals `addr2`.
-pub fn validate_addresses_different(addr1: &Address, addr2: &Address, context: &str) {
+pub fn validate_addresses_different(env: &Env, addr1: &Address, addr2: &Address, _context: &str) {
     if addr1 == addr2 {
-        panic!("{}: addresses must be different", context);
+        panic_with_error!(env, Error::SameAddress);
     }
 }
 
 /// Panics if `address` is not present in `allowed`.
 #[allow(dead_code)]
-pub fn validate_address_in_list(address: &Address, allowed: &Vec<Address>, context: &str) {
+pub fn validate_address_in_list(env: &Env, address: &Address, allowed: &Vec<Address>, _context: &str) {
     if !allowed.contains(address) {
-        panic!("{}: address not authorised", context);
+        panic_with_error!(env, Error::Unauthorized);
     }
 }
 
 // ── String validators ─────────────────────────────────────────────────────────
 
 /// Panics if the Soroban `String` is empty.
-pub fn validate_string_not_empty(s: &String, field_name: &str) {
+pub fn validate_string_not_empty(env: &Env, s: &String, field_name: &str) {
     if s.len() == 0 {
-        panic!("{} must not be empty", field_name);
+        panic_with_error!(env, Error::InvalidInput);
     }
 }
 
 /// Panics if the Soroban `String` exceeds `max_len` characters.
-pub fn validate_string_max_len(s: &String, max_len: u32, field_name: &str) {
+pub fn validate_string_max_len(env: &Env, s: &String, max_len: u32, field_name: &str) {
     if s.len() > max_len {
-        panic!("{} must not exceed {} characters", field_name, max_len);
+        panic_with_error!(env, Error::InvalidInput);
     }
 }
 
 /// Convenience: validates both non-empty and max length.
 #[allow(dead_code)]
-pub fn validate_string(s: &String, max_len: u32, field_name: &str) {
-    validate_string_not_empty(s, field_name);
-    validate_string_max_len(s, max_len, field_name);
+pub fn validate_string(env: &Env, s: &String, max_len: u32, field_name: &str) {
+    validate_string_not_empty(env, s, field_name);
+    validate_string_max_len(env, s, max_len, field_name);
 }
 
 // ── Timestamp validators ──────────────────────────────────────────────────────
 
 /// Panics if `timestamp` is not strictly in the future.
 #[allow(dead_code)]
-pub fn validate_future_timestamp(timestamp: u64, current_time: u64, field_name: &str) {
+pub fn validate_future_timestamp(env: &Env, timestamp: u64, current_time: u64, field_name: &str) {
     if timestamp <= current_time {
-        panic!("{} must be in the future", field_name);
+        panic_with_error!(env, Error::InvalidSchedule);
     }
 }
 
 /// Panics if `end` is not strictly after `start`.
 #[allow(dead_code)]
-pub fn validate_time_range(start: u64, end: u64) {
+pub fn validate_time_range(env: &Env, start: u64, end: u64) {
     if end <= start {
-        panic!("End time must be after start time");
+        panic_with_error!(env, Error::InvalidSchedule);
     }
 }
 
@@ -244,17 +235,17 @@ pub fn validate_time_range(start: u64, end: u64) {
 
 /// Panics if a `Vec` is empty.
 #[allow(dead_code)]
-pub fn validate_not_empty_collection(len: u32, field_name: &str) {
+pub fn validate_not_empty_collection(env: &Env, len: u32, field_name: &str) {
     if len == 0 {
-        panic!("{} must not be empty", field_name);
+        panic_with_error!(env, Error::InvalidInput);
     }
 }
 
 /// Panics if a `Vec` length exceeds `max`.
 #[allow(dead_code)]
-pub fn validate_max_collection_size(len: u32, max: u32, field_name: &str) {
+pub fn validate_max_collection_size(env: &Env, len: u32, max: u32, field_name: &str) {
     if len > max {
-        panic!("{} must not exceed {} items", field_name, max);
+        panic_with_error!(env, Error::InvalidInput);
     }
 }
 
@@ -271,12 +262,7 @@ pub fn validate_waste_submission(weight: u128, latitude: i128, longitude: i128) 
 }
 
 /// Full validation for participant registration.
-pub fn validate_participant_registration(
-    env: &Env,
-    address: &Address,
-    latitude: i128,
-    longitude: i128,
-) {
+pub fn validate_participant_registration(env: &Env, address: &Address, latitude: i128, longitude: i128) {
     validate_address_not_contract(env, address);
     validate_coordinates(latitude, longitude);
 }

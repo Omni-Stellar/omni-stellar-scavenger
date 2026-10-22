@@ -1,7 +1,7 @@
 #![cfg(test)]
 
-use proptest::prelude::*;
 use crate::validation::*;
+use proptest::prelude::*;
 
 // Strategy for valid positive amounts (1..i128::MAX)
 fn valid_positive_amount() -> impl Strategy<Value = i128> {
@@ -30,10 +30,7 @@ fn valid_latitude() -> impl Strategy<Value = i128> {
 
 // Strategy for invalid latitudes (< -90,000,000 or > 90,000,000)
 fn invalid_latitude() -> impl Strategy<Value = i128> {
-    prop_oneof![
-        i128::MIN..=-90_000_001i128,
-        90_000_001i128..=i128::MAX,
-    ]
+    prop_oneof![i128::MIN..=-90_000_001i128, 90_000_001i128..=i128::MAX,]
 }
 
 // Strategy for valid longitudes (-180,000,000..=180,000,000)
@@ -43,10 +40,7 @@ fn valid_longitude() -> impl Strategy<Value = i128> {
 
 // Strategy for invalid longitudes (< -180,000,000 or > 180,000,000)
 fn invalid_longitude() -> impl Strategy<Value = i128> {
-    prop_oneof![
-        i128::MIN..=-180_000_001i128,
-        180_000_001i128..=i128::MAX,
-    ]
+    prop_oneof![i128::MIN..=-180_000_001i128, 180_000_001i128..=i128::MAX,]
 }
 
 // Strategy for valid positive u128
@@ -63,7 +57,7 @@ proptest! {
     #[test]
     fn prop_validate_positive_amount_accepts_positive_values(amount in valid_positive_amount()) {
         // Should not panic for valid amounts
-        validate_positive_amount(amount, "test_amount");
+        validate_positive_amount(&soroban_sdk::Env::default(), amount, "test_amount");
         prop_assert!(true);
     }
 
@@ -71,7 +65,7 @@ proptest! {
     fn prop_validate_positive_amount_rejects_invalid_values(amount in invalid_amount()) {
         // Should panic for invalid amounts
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_positive_amount(amount, "test_amount");
+            validate_positive_amount(&soroban_sdk::Env::default(), amount, "test_amount");
         }));
         prop_assert!(result.is_err());
     }
@@ -80,7 +74,7 @@ proptest! {
     fn prop_validate_positive_amount_never_panics_on_arbitrary_input(amount in any::<i128>()) {
         // Test that validator handles all inputs gracefully (catching panics)
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_positive_amount(amount, "test_field");
+            validate_positive_amount(&soroban_sdk::Env::default(), amount, "test_field");
         }));
         // Either succeeds or fails as expected
         let _ = result;
@@ -89,14 +83,14 @@ proptest! {
 
     #[test]
     fn prop_validate_percentage_accepts_valid_values(percentage in valid_percentage()) {
-        validate_percentage(percentage, "test_percentage");
+        validate_percentage(&soroban_sdk::Env::default(), percentage, "test_percentage");
         prop_assert!(true);
     }
 
     #[test]
     fn prop_validate_percentage_rejects_invalid_values(percentage in invalid_percentage()) {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_percentage(percentage, "test_percentage");
+            validate_percentage(&soroban_sdk::Env::default(), percentage, "test_percentage");
         }));
         prop_assert!(result.is_err());
     }
@@ -104,7 +98,7 @@ proptest! {
     #[test]
     fn prop_validate_percentage_never_panics_on_arbitrary_input(percentage in any::<u32>()) {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_percentage(percentage, "test_field");
+            validate_percentage(&soroban_sdk::Env::default(), percentage, "test_field");
         }));
         let _ = result;
         prop_assert!(true);
@@ -115,7 +109,7 @@ proptest! {
         lat in valid_latitude(),
         lon in valid_longitude()
     ) {
-        validate_coordinates(lat, lon);
+        validate_coordinates(&soroban_sdk::Env::default(), lat, lon);
         prop_assert!(true);
     }
 
@@ -125,7 +119,7 @@ proptest! {
         lon in valid_longitude()
     ) {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_coordinates(lat, lon);
+            validate_coordinates(&soroban_sdk::Env::default(), lat, lon);
         }));
         prop_assert!(result.is_err());
     }
@@ -136,7 +130,7 @@ proptest! {
         lon in invalid_longitude()
     ) {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_coordinates(lat, lon);
+            validate_coordinates(&soroban_sdk::Env::default(), lat, lon);
         }));
         prop_assert!(result.is_err());
     }
@@ -147,7 +141,7 @@ proptest! {
         lon in any::<i128>()
     ) {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_coordinates(lat, lon);
+            validate_coordinates(&soroban_sdk::Env::default(), lat, lon);
         }));
         let _ = result;
         prop_assert!(true);
@@ -155,14 +149,14 @@ proptest! {
 
     #[test]
     fn prop_validate_positive_u128_accepts_positive_values(amount in valid_positive_u128()) {
-        validate_positive_u128(amount, "test_amount");
+        validate_positive_u128(&soroban_sdk::Env::default(), amount, "test_amount");
         prop_assert!(true);
     }
 
     #[test]
     fn prop_validate_positive_u128_rejects_zero(amount in invalid_u128_zero()) {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_positive_u128(amount, "test_amount");
+            validate_positive_u128(&soroban_sdk::Env::default(), amount, "test_amount");
         }));
         prop_assert!(result.is_err());
     }
@@ -170,7 +164,7 @@ proptest! {
     #[test]
     fn prop_validate_positive_u128_never_panics_on_arbitrary_input(amount in any::<u128>()) {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_positive_u128(amount, "test_field");
+            validate_positive_u128(&soroban_sdk::Env::default(), amount, "test_field");
         }));
         let _ = result;
         prop_assert!(true);
@@ -185,7 +179,7 @@ mod regression_tests {
     #[test]
     fn regression_min_i128_should_fail_positive_amount() {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_positive_amount(i128::MIN, "test");
+            validate_positive_amount(&soroban_sdk::Env::default(), i128::MIN, "test");
         }));
         assert!(result.is_err());
     }
@@ -193,7 +187,7 @@ mod regression_tests {
     #[test]
     fn regression_max_lat_boundary() {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_coordinates(90_000_000, 0);
+            validate_coordinates(&soroban_sdk::Env::default(), 90_000_000, 0);
         }));
         assert!(result.is_ok());
     }
@@ -201,7 +195,7 @@ mod regression_tests {
     #[test]
     fn regression_max_lat_boundary_exceeded() {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_coordinates(90_000_001, 0);
+            validate_coordinates(&soroban_sdk::Env::default(), 90_000_001, 0);
         }));
         assert!(result.is_err());
     }
@@ -209,7 +203,7 @@ mod regression_tests {
     #[test]
     fn regression_max_lon_boundary() {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_coordinates(0, 180_000_000);
+            validate_coordinates(&soroban_sdk::Env::default(), 0, 180_000_000);
         }));
         assert!(result.is_ok());
     }
@@ -217,21 +211,21 @@ mod regression_tests {
     #[test]
     fn regression_max_lon_boundary_exceeded() {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_coordinates(0, 180_000_001);
+            validate_coordinates(&soroban_sdk::Env::default(), 0, 180_000_001);
         }));
         assert!(result.is_err());
     }
 
     #[test]
     fn regression_percentage_boundary() {
-        validate_percentage(100, "test");
+        validate_percentage(&soroban_sdk::Env::default(), 100, "test");
         assert!(true);
     }
 
     #[test]
     fn regression_percentage_boundary_exceeded() {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            validate_percentage(101, "test");
+            validate_percentage(&soroban_sdk::Env::default(), 101, "test");
         }));
         assert!(result.is_err());
     }
