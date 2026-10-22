@@ -112,6 +112,8 @@ pub enum KeyRotationError {
     ZeroKeyHash = 5,
     /// A key already exists for this purpose — use `rotate_key` instead.
     AlreadyExists = 6,
+    /// The version counter would overflow `u32`.
+    Overflow = 7,
 }
 
 #[cfg(test)]

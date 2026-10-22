@@ -13,7 +13,7 @@ The contract has grown to more than 200 public entrypoints spread across waste, 
 
 ## Decision
 
-We will keep every exported entrypoint in the `#[contractimpl]` block in `stellar-contract/src/lib.rs`. Each entrypoint is a thin wrapper that delegates to a domain module (`waste_mgmt.rs`, `transfer_mgmt.rs`, `participant_mgmt.rs`, `incentive_mgmt.rs`, `verification.rs` and so on). Shared types live in `types.rs` and errors in `errors.rs`. Storage keys live in `storage_keys.rs` (see ADR-0004).
+We will keep every exported entrypoint in the `#[contractimpl]` block in `stellar-contract/src/lib.rs`. Each entrypoint is a thin wrapper that delegates to a domain module (`waste.rs`, `transfer_mgmt.rs`, `participant_mgmt.rs`, `incentive_mgmt.rs`, `verification.rs` and so on). Shared types live in `types.rs` and errors in `errors.rs`. Storage keys live in `storage_keys.rs` (see ADR-0004).
 
 ## Alternatives Considered
 
