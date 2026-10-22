@@ -1,5 +1,4 @@
-//! Core type definitions for the omni-stellar-omni-stellar-scavenger contract.
-use soroban_sdk::{contracttype, Address, String, Symbol};
+//! Re-export fa?ade for the contract types.
 
 use crate::errors::Error;
 

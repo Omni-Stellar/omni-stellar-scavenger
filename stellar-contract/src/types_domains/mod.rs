@@ -1,11 +1,27 @@
-//! Per-domain type groupings for the contract crate.
-//!
-//! The canonical type definitions still live in `crate::types` to avoid any
-//! change to serialized layout or breaking external paths. These submodules
-//! re-export the subset of types relevant to each domain so that call sites
-//! can `use crate::types_domains::waste::*;` (etc.) instead of pulling in
-//! the entire monolithic `types` module.
+//! Canonical Soroban contract types, organized by domain.
 
-pub mod waste;
-pub mod participant;
-pub mod rewards;
+use soroban_sdk::{contracttype, Address, String, Symbol};
+
+mod analytics;
+pub use analytics::*;
+mod compliance;
+pub use compliance::*;
+mod engagement;
+pub use engagement::*;
+mod incentives;
+pub use incentives::*;
+mod marketplace;
+pub use marketplace::*;
+mod participants;
+pub use participants::*;
+mod permissions;
+pub use permissions::*;
+mod transfers;
+pub use transfers::*;
+mod waste;
+pub use waste::*;
+
+#[cfg(test)]
+mod serialization_tests;
+#[cfg(test)]
+mod tests;
