@@ -26,12 +26,15 @@ vi.mock('@/lib/cacheKeys', () => ({
   },
 }))
 
+// ── Centralised omni-stellar-omni-stellar-scavengerClient mock (#1546) ──────────────────────────────────
+import { createMockClient } from '@/test-utils/mockomni-stellar-omni-stellar-scavengerClient'
+
 const mockGetStats = vi.fn()
 
 vi.mock('@/api/client', () => ({
-  omni-stellar-omni-stellar-scavengerClient: vi.fn().mockImplementation(() => ({
-    getStats: mockGetStats,
-  })),
+  omni-stellar-omni-stellar-scavengerClient: vi.fn().mockImplementation(() =>
+    createMockClient({ getStats: mockGetStats })
+  ),
 }))
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
