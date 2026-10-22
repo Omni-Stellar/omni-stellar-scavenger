@@ -16,8 +16,14 @@ vi.mock('@/hooks/useResource', () => ({
   })),
 }))
 
+// ── Centralised omni-stellar-omni-stellar-scavengerClient mock (#1546) ──────────────────────────────────
+// omni-stellar-omni-stellar-scavengerClient speaks Soroban RPC (not REST HTTP) so MSW cannot intercept
+// its requests.  We use the shared mock factory so the mock shape is defined
+// in one place across all test files.
+import { createMockClient } from '@/test-utils/mockomni-stellar-omni-stellar-scavengerClient'
+
 vi.mock('@/api/client', () => ({
-  omni-stellar-omni-stellar-scavengerClient: vi.fn(() => ({})),
+  omni-stellar-omni-stellar-scavengerClient: vi.fn().mockImplementation(() => createMockClient()),
 }))
 
 vi.mock('@/config', () => ({ config: { contractId: 'TEST' } }))

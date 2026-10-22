@@ -2,7 +2,7 @@
 // Shared Stellar SDK mock for frontend tests (issue #1283)
 //
 // Usage for new test authors:
-//   import { createStellarMock, resetStellarMock } from "../test/stellarMock";
+//   import { createStellarMock, resetStellarMock } from "@/test-utils/stellarMock";
 //
 //   vi.mock("@stellar/stellar-sdk", () => createStellarMock());
 //
@@ -92,7 +92,9 @@ export function createStellarMock(overrides: StellarMockOverrides = {}) {
     Horizon: { Server: vi.fn().mockImplementation(() => server) },
     nativeToScVal: vi.fn().mockImplementation((value: unknown) => value),
     scValToNative: vi.fn().mockImplementation((value: unknown) => value),
-    Address: { fromString: vi.fn().mockReturnValue({ toString: () => MOCK_PUBLIC_KEY }) },
+    Address: {
+      fromString: vi.fn().mockReturnValue({ toString: () => MOCK_PUBLIC_KEY }),
+    },
     __server: server,
     __contract: contract,
     __keypair: keypair,

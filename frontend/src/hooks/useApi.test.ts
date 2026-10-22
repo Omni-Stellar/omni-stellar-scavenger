@@ -23,14 +23,19 @@ vi.mock('@/lib/stellar', () => ({
   networkConfig: { networkPassphrase: 'Test SDF Network ; September 2015' },
 }))
 
+// ── Centralised omni-stellar-omni-stellar-scavengerClient mock (#1546) ──────────────────────────────────
+// omni-stellar-omni-stellar-scavengerClient speaks Soroban RPC (not REST) so MSW cannot intercept its
+// requests.  Instead we use a shared mock factory defined in test-utils so
+// every test file that needs a omni-stellar-omni-stellar-scavengerClient mock gets the same shape.
+import { createMockClient } from '@/test-utils/mockomni-stellar-omni-stellar-scavengerClient'
+
 const mockGetParticipant = vi.fn()
 const mockSubmitMaterial = vi.fn()
 
 vi.mock('@/api/client', () => ({
-  omni-stellar-omni-stellar-scavengerClient: vi.fn().mockImplementation(() => ({
-    getParticipant: mockGetParticipant,
-    submitMaterial: mockSubmitMaterial,
-  })),
+  omni-stellar-omni-stellar-scavengerClient: vi.fn().mockImplementation(() =>
+    createMockClient({ getParticipant: mockGetParticipant, submitMaterial: mockSubmitMaterial })
+  ),
 }))
 
 import { omni-stellar-omni-stellar-scavengerClient } from '@/api/client'
