@@ -11,20 +11,20 @@ The `contributing.test.ts` file programmatically verifies that the project's con
 3. **Function Length Guidelines**: The 50-line guideline for new functions
 4. **PR Process**: Branch prefixes (`feature/`, `fix/`, `docs/`), maintainer approval, CI checks
 5. **One Concern Per PR**: Single-purpose pull requests
-6. **Testing Requirements**: Soroban test framework, `cargo test`, `npm test`, coverage requirements
+6. **Testing Requirements**: Soroban test framework, `cargo test`, `pnpm test`, coverage requirements
 7. **New Public API Testing**: Requirement to test every new public API
 
 ## Running Tests
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Run tests
-npm test
+pnpm test
 
 # Watch mode (re-run on file changes)
-npm test -- --watch
+pnpm test -- --watch
 ```
 
 ## Test Results
@@ -45,7 +45,7 @@ All tests must pass before PRs that modify `CONTRIBUTING.md` can be merged. This
 If you modify the `CONTRIBUTING.md` file, ensure all tests pass:
 ```bash
 cd tests/contributing-guidelines/
-npm test
+pnpm test
 ```
 
 If you need to update the guidelines and the tests fail, modify both `CONTRIBUTING.md` (to add the new requirement) and `contributing.test.ts` (to verify it).

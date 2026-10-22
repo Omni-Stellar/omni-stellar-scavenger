@@ -46,11 +46,3 @@ repos:
         entry: pnpm exec eslint --fix
         types_or: [javascript, jsx, ts, tsx]
         pass_filenames: true
-
-  # Strip Jupyter notebook output before committing
-  # Requires `nbstripout` to be installed: `pip install nbstripout`
-  - repo: https://github.com/kynan/nbstripout
-    rev: 0.7.1
-    hooks:
-      - id: nbstripout
-        files: commit_push\.ipynb
