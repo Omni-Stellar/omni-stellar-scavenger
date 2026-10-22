@@ -1,57 +1,38 @@
-# Error Consolidation Audit
+# Stellar Contract Error Consolidation
 
-## Audit scope
+This implementation record captures the consolidation tasks from issue #1505.
+The referenced file was not present in the checked-out `main` branch, so its
+original checklist could not be reviewed; the items below are taken from the
+issue description and acceptance criteria.
 
-Searched `stellar-contract/src/*.rs` for locally-defined error enums that
-duplicate `errors.rs`:
+## Status
 
-```
-grep -n "pub enum.*Error" stellar-contract/src/*.rs
-```
+- [x] Keep Soroban contract errors in the shared `src/errors.rs` `Error` enum.
+- [x] Reserve one stable `u32` range per error domain:
+  - Auth: `1000–1099`
+  - Input: `2000–2099`
+  - State: `3000–3099`
+  - NotFound: `4000–4099`
+  - Arithmetic: `5000–5099`
+  - Config: `6000–6099`
+- [x] Consolidate duplicate waste-type mismatch variants into
+  `Error::WasteTypeMismatch`.
+- [x] Remove duplicate validation helper definitions and route percentage
+  validation through one shared helper.
+- [x] Add a unit test that checks the actual enum discriminants for uniqueness
+  and another that checks each discriminant against its domain range.
+- [x] Publish the full numeric-code table in
+  `../docs/ERROR_MESSAGE_GUIDE.md`.
 
-Findings:
+The numeric assignments replace the former sequential `1–54` contract error
+codes. Client applications that switch on those numeric values must update to
+the table in the error guide. Retired codes must not be reused.
 
-- `waste.rs`, `incentive.rs`, `participant.rs`, and `lib.rs` already return
-  `Result<_, Error>` using the shared `crate::errors::Error` enum. No
-  duplicate contract-level error enum was found in these files.
-- `key_rotation.rs` defines `KeyRotationError` (6 variants) and `zkp.rs`
-  defines `CommitmentError` (6 variants). Both are subsystem-local helper
-  enums, not `#[contracterror]` types surfaced directly to external
-  callers, which the existing authoring rules in `errors.rs` (rule #3)
-  explicitly allow to remain local.
+`KeyRotationError` and `CommitmentError` remain local subsystem helper enums;
+neither is a Soroban `#[contracterror]` type exposed as the contract error
+surface.
 
-## Change made
-
-To move toward a single source of truth without risking a breaking change
-to either subsystem's existing call sites, `errors.rs` gained twelve new,
-purely additive variants (codes 55-66) that mirror `KeyRotationError` and
-`CommitmentError` one-for-one:
-
-- `KeyRotationNoActiveKey`, `KeyRotationVersionNotFound`,
-  `KeyRotationUnauthorized`, `KeyRotationCannotPurgeActive`,
-  `KeyRotationZeroKeyHash`, `KeyRotationAlreadyExists`
-- `CommitmentNotFound`, `CommitmentHashMismatch`,
-  `CommitmentAlreadyVerified`, `CommitmentCancelled`, `CommitmentExpired`,
-  `CommitmentNotPending`
-
-Existing numeric codes (1-54) were **not** renumbered, so this is
-non-breaking for anything matching on or serializing `Error`. The
-`category()` and `code()` match arms were updated to cover the new
-variants so the crate continues to compile with an exhaustive match.
-
-## Follow-up (not done in this change)
-
-`key_rotation.rs` and `zkp.rs` still return their own local error types
-from their public functions. Migrating `authorize()` in `key_rotation.rs`
-and the commitment-verification functions in `zkp.rs` to return
-`crate::errors::Error` instead of `KeyRotationError`/`CommitmentError` is
-a larger change (it changes the public function signatures of those
-modules) and is recommended as a follow-up PR so it can be reviewed and
-tested independently.
-
-## Acceptance criteria status
-
-- [x] Audited contract modules for duplicate error enums
-- [x] Additive shared variants added to `errors.rs` (single source of
-      truth for new consolidation work)
-- [ ] Full migration of `key_rotation.rs` / `zkp.rs` call sites (follow-up)
+Validation helpers that continue to panic were not migrated to
+`Result<_, Error>` here: doing so would require changing the return type and
+client-visible behavior of unrelated contract entry points. This change only
+consolidates duplicate validation helpers and the Soroban error code surface.

@@ -5314,7 +5314,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
     /// - [`Error::WasteNotFound`] if any ID does not exist.
     /// - [`Error::NotWasteOwner`] if `owner` does not own every waste.
     /// - [`Error::WasteDeactivated`] if any waste is already deactivated.
-    /// - [`Error::WasteTypeMismatchMerge`] if wastes have different types.
+    /// - [`Error::WasteTypeMismatch`] if wastes have different types.
     /// - [`Error::LocationMismatch`] if wastes are at different locations.
     pub fn merge_wastes(env: Env, waste_ids: Vec<u128>, owner: Address) -> Result<u128, Error> {
         owner.require_auth();
@@ -5346,7 +5346,7 @@ impl omni-stellar-omni-stellar-scavengerContract {
 
             match ref_type {
                 None => ref_type = Some(waste.waste_type),
-                Some(t) if t != waste.waste_type => return Err(Error::WasteTypeMismatchMerge),
+                Some(t) if t != waste.waste_type => return Err(Error::WasteTypeMismatch),
                 _ => {}
             }
 
