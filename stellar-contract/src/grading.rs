@@ -25,12 +25,15 @@
 //! | C     | 100              | Average quality |
 //! | D     | 70               | Poor quality |
 
-use crate::types::{WasteGrade, WasteType};
-use soroban_sdk::{Address, Env, Vec};
+use crate::types::{GradeRecord, WasteGrade, WasteType};
+use soroban_sdk::{Address, Env};
 
 /// Apply the grade multiplier to a base reward: `base * grade.multiplier_pct() / 100`.
+///
+/// Saturates on overflow rather than wrapping; the multiplier is a small
+/// bounded percentage, so this only triggers for near-`u64::MAX` inputs.
 pub fn apply_grade_multiplier(base_reward: u64, grade: WasteGrade) -> u64 {
-    base_reward * grade.multiplier_pct() / 100
+    base_reward.saturating_mul(grade.multiplier_pct() as u64) / 100
 }
 
 /// Validate that a grade meets the minimum acceptable grade for a waste type.
@@ -47,27 +50,19 @@ pub fn min_acceptable_grade(waste_type: WasteType) -> WasteGrade {
 ///
 /// This consolidates the grade recording logic from the public
 /// `set_waste_grade` entry point into a reusable function.
-pub fn record_grade(
-    env: &Env,
-    waste_id: u128,
-    grade: WasteGrade,
-    grader_address: &Address,
-) {
-    let history_key = ("grade_history", waste_id);
-    let mut history: Vec<GradeRecord> = env
-        .storage()
-        .instance()
-        .get(&history_key)
-        .unwrap_or(Vec::new(env));
-    history.push_back(GradeRecord {
+pub fn record_grade(env: &Env, waste_id: u128, grade: WasteGrade, grader_address: &Address) {
+    crate::waste_storage::append_grade_record(
+        env,
         waste_id,
-        grade,
-        grader: grader_address.clone(),
-        graded_at: env.ledger().timestamp(),
-    });
-    env.storage().instance().set(&history_key, &history);
+        &GradeRecord {
+            waste_id,
+            grade,
+            grader: grader_address.clone(),
+            graded_at: env.ledger().timestamp(),
+        },
+    );
 
-    let stats_key = ("stats", grader_address.clone());
+    let stats_key = crate::storage_keys::stats_key(grader_address);
     let mut stats: crate::types::RecyclingStats = env
         .storage()
         .instance()
@@ -95,7 +90,7 @@ pub fn is_valid_grade_value(v: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{WasteGrade, WasteType};
+    use crate::types::{GradeRecord, WasteGrade, WasteType};
 
     #[test]
     fn test_apply_grade_multiplier() {

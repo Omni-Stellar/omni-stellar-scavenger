@@ -84,6 +84,11 @@ pub fn rotate_key(
         .get::<KeyStorage, u32>(&active_slot)
         .ok_or(KeyRotationError::NoActiveKey)?;
 
+    // Compute the new version before mutating storage. Rotation is rejected
+    // rather than wrapping if the counter is exhausted; the old key stays
+    // active and unchanged.
+    let new_version = old_version.checked_add(1).ok_or(KeyRotationError::Overflow)?;
+
     // Archive old record
     let old_key_slot = KeyStorage::Key(purpose, old_version);
     let mut old_record = env
@@ -96,9 +101,6 @@ pub fn rotate_key(
     env.storage()
         .instance()
         .set::<KeyStorage, KeyRecord>(&old_key_slot, &old_record);
-
-    // Install new version
-    let new_version = old_version + 1;
     let new_record = KeyRecord {
         purpose,
         version: new_version,
@@ -141,9 +143,7 @@ pub fn revoke_key_version(
 
     record.status = KeyStatus::Revoked;
     record.archived_at = env.ledger().timestamp();
-    env.storage()
-        .instance()
-        .set::<KeyStorage, KeyRecord>(&slot, &record);
+    env.storage().instance().set::<KeyStorage, KeyRecord>(&slot, &record);
 
     emit_key_event(env, "key_rev", purpose, version, admin);
     Ok(())
@@ -198,8 +198,7 @@ fn emit_key_event(env: &Env, action: &str, purpose: KeyPurpose, version: u32, ac
         "key_prg" => symbol_short!("key_prg"),
         _ => symbol_short!("key_evt"),
     };
-    env.events()
-        .publish((sym, actor), (purpose.to_u32(), version));
+    env.events().publish((sym, actor), (purpose.to_u32(), version));
 }
 
 #[cfg(test)]
@@ -229,8 +228,7 @@ mod tests {
         let env = Env::default();
         let (admin, admins) = setup(&env);
         let hash = make_hash(&env, 0xAA);
-        let version =
-            install_key(&env, &admin, &admins, KeyPurpose::WebhookSigning, hash.clone()).unwrap();
+        let version = install_key(&env, &admin, &admins, KeyPurpose::WebhookSigning, hash.clone()).unwrap();
         assert_eq!(version, 1);
         let record = schedule::get_active_key(&env, KeyPurpose::WebhookSigning).unwrap();
         assert_eq!(record.key_hash, hash);
@@ -278,8 +276,7 @@ mod tests {
         let env = Env::default();
         let (admin, admins) = setup(&env);
         install_key(&env, &admin, &admins, KeyPurpose::ApiKeyHash, make_hash(&env, 0x01)).unwrap();
-        let v2 = rotate_key(&env, &admin, &admins, KeyPurpose::ApiKeyHash, make_hash(&env, 0x02))
-            .unwrap();
+        let v2 = rotate_key(&env, &admin, &admins, KeyPurpose::ApiKeyHash, make_hash(&env, 0x02)).unwrap();
         assert_eq!(v2, 2);
         let active = schedule::get_active_key(&env, KeyPurpose::ApiKeyHash).unwrap();
         assert_eq!(active.version, 2);
@@ -391,5 +388,19 @@ mod tests {
 
     // ── Edge cases: invalid / expired key rotation attempts ──────────────────────
 
+    #[test]
+    fn rotate_key_rejects_version_overflow() {
+        let env = Env::default();
+        let (admin, admins) = setup(&env);
+        let purpose = KeyPurpose::WebhookSigning;
 
+        install_key(&env, &admin, &admins, purpose, make_hash(&env, 0x11)).unwrap();
+        env.storage().instance().set(&KeyStorage::Active(purpose), &u32::MAX);
+
+        assert_eq!(
+            rotate_key(&env, &admin, &admins, purpose, make_hash(&env, 0x22)),
+            Err(KeyRotationError::Overflow)
+        );
+        assert_eq!(schedule::active_version(&env, purpose), Some(u32::MAX));
+    }
 }
