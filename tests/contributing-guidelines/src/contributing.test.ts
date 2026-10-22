@@ -10,7 +10,7 @@
 // frontend/ in the project root).
 //
 // To run these tests:
-//   cd tests/contributing-guidelines && npm test
+//   cd tests/contributing-guidelines && pnpm test
 // =============================================================================
 
 /// <reference types="vitest" />
@@ -87,8 +87,8 @@ describe("Property 4: testing section contains all required testing guidance", (
   it("contains cargo test command", () => {
     expect(contributingMd).toContain("cargo test");
   });
-  it("contains npm test command", () => {
-    expect(contributingMd).toContain("npm test");
+  it("contains pnpm test command", () => {
+    expect(contributingMd).toContain("pnpm test");
   });
   it("contains coverage requirement", () => {
     expect(contributingMd.toLowerCase()).toContain("coverage");
@@ -165,8 +165,8 @@ describe("Property 7: setup section contains all required prerequisites and comm
   it("contains Node.js reference", () => {
     expect(contributingMd).toContain("Node.js");
   });
-  it("contains npm install command", () => {
-    expect(contributingMd).toContain("npm install");
+  it("contains pnpm install command", () => {
+    expect(contributingMd).toContain("pnpm install");
   });
   it("contains git clone command", () => {
     expect(contributingMd).toContain("git clone");

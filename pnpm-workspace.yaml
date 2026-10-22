@@ -4,7 +4,12 @@ packages:
   - 'backend'
   - 'frontend'
   - 'mobile'
+  - 'docs/tests'
+  - 'security-tests'
+  - 'tests/contract'
+  - 'tests/contributing-guidelines'
   - 'tests/integration'
+  - 'website'
 allowBuilds:
   '@firebase/util': true
   core-js: true

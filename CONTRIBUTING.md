@@ -36,7 +36,14 @@ Thank you for your interest in contributing to omni-stellar-omni-stellar-scaveng
 #### Frontend (React / TypeScript)
 
 - **Node.js** — LTS version recommended. Download from [nodejs.org](https://nodejs.org/) or use a version manager such as `nvm`.
-- **pnpm** — install via `npm install -g pnpm`.
+- **pnpm** — enable via [Corepack](https://nodejs.org/api/corepack.html), which ships with Node.js:
+  ```bash
+  corepack enable
+  ```
+
+> **pnpm-only policy:** This repository uses pnpm exclusively. Install and run Node.js
+> dependencies and scripts from the repository root. Do not use `npm install` or `npm ci`,
+> and do not commit `package-lock.json` files.
 
 ### Clone and Install
 
@@ -57,8 +64,8 @@ pnpm install
 ## Pre-commit Hooks
 
 This repository uses [pre-commit](https://pre-commit.com/) to enforce formatting and linting
-automatically before every commit. The hooks cover all three languages used in the project:
-Rust, TypeScript/JavaScript, and Python notebooks.
+automatically before every commit. The hooks cover the languages used in the project:
+Rust and TypeScript/JavaScript.
 
 ### Setup
 
@@ -66,10 +73,7 @@ Rust, TypeScript/JavaScript, and Python notebooks.
 # 1. Install pre-commit itself
 pip install pre-commit
 
-# 2. Install nbstripout (Jupyter notebook output stripping)
-pip install nbstripout
-
-# 3. Install the hooks into your local clone
+# 2. Install the hooks into your local clone
 pre-commit install
 ```
 
@@ -88,7 +92,6 @@ rustup component add rustfmt
 | `cargo-fmt` | Rust (`.rs`) | Runs `cargo fmt --all` and blocks commits that aren't formatted |
 | `prettier` | TS, JS, JSON, CSS, MD | Reformats files to the project's Prettier config |
 | `eslint` | TS, JS | Runs ESLint with `--fix`; blocks commits with unfixable lint errors |
-| `nbstripout` | Jupyter (`.ipynb`) | Strips cell outputs from `commit_push.ipynb` before committing |
 | `terraform_fmt` / `terraform_validate` | Terraform | Formats and validates Terraform configs |
 | `trailing-whitespace` / `end-of-file-fixer` | All | Generic file hygiene |
 
@@ -101,7 +104,6 @@ pre-commit run --all-files
 # Run a specific hook
 pre-commit run cargo-fmt --all-files
 pre-commit run prettier --all-files
-pre-commit run nbstripout --all-files
 ```
 
 ---

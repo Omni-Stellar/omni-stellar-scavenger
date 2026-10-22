@@ -1,6 +1,7 @@
 {
 	"name": "omni-stellar-scavenger",
 	"private": true,
+	"packageManager": "pnpm@12.11.2",
 	"scripts": {
 		"test:integration": "pnpm --filter omni-stellar-scavenger-integration-tests test"
 	},
