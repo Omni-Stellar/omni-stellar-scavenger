@@ -35,3 +35,12 @@ A decentralized recycling platform built on Stellar blockchain using Soroban sma
 
 <!-- handsoff-issue-1294 -->
 - #1294: [Testing] Add test fixtures/mocks for `security-tests/` Stellar interactions
+
+## Resolved Issues
+
+The following issues have been addressed in this release:
+
+- Added issue templates for bug reports and feature requests
+- Added contributing guidelines and CODEOWNERS
+- Improved repository documentation and onboarding
+
